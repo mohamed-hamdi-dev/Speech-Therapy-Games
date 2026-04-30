@@ -1,0 +1,50 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Outfit:wght@400;600;700;800&display=swap');
+
+@theme {
+  --font-arabic: 'Cairo', sans-serif;
+  --font-en: 'Outfit', sans-serif;
+  --color-primary: #3b82f6; /* Blue */
+  --color-primary-hover: #2563eb;
+  --color-secondary: #ec4899; /* Pink */
+  --color-secondary-hover: #db2777;
+  --color-accent: #10b981; /* Green */
+  --color-background: #ffffff;
+  --color-dark: #1e293b; /* Slate 800 */
+}
+
+@layer base {
+  html, body, #root {
+    @apply bg-slate-50 text-slate-800 w-full min-h-screen m-0 p-0;
+    font-family: var(--font-arabic);
+    direction: rtl;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-blue-500 text-white font-bold py-3 px-8 rounded-2xl shadow-lg hover:shadow-xl hover:bg-blue-600 hover:-translate-y-1 transition-all duration-300 active:scale-95 border-none;
+  }
+  .btn-secondary {
+    @apply bg-pink-500 text-white font-bold py-3 px-8 rounded-2xl shadow-lg hover:shadow-xl hover:bg-pink-600 hover:-translate-y-1 transition-all duration-300 active:scale-95 border-none;
+  }
+  .btn-outline {
+    @apply bg-white border-2 border-slate-200 text-slate-700 font-bold py-3 px-8 rounded-2xl shadow-sm hover:border-blue-500 hover:text-blue-500 hover:-translate-y-1 transition-all duration-300 active:scale-95;
+  }
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+  .card {
+    @apply bg-white rounded-3xl shadow-md overflow-hidden border border-slate-100 transition-all duration-300 hover:shadow-xl;
+  }
+}

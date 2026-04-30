@@ -1,0 +1,91 @@
+{
+  "games": [
+    {
+      "id": 1,
+      "title": "Listen and Choose",
+      "titleAr": "اسمع واختار",
+      "type": "listen_choose",
+      "level": 1,
+      "questionText": "Show me the flower",
+      "questionTextAr": "وريني الوردة",
+      "questionAudio": "",
+      "options": [
+        {
+          "id": 1,
+          "text": "Flower",
+          "textAr": "وردة",
+          "image": "http://localhost:5000/uploads/1777506684109.jpg",
+          "isCorrect": true
+        },
+        {
+          "id": 2,
+          "text": "Car",
+          "textAr": "عربية",
+          "image": "http://localhost:5000/uploads/1777506720506.jpg",
+          "isCorrect": false
+        }
+      ],
+      "successSound": "",
+      "failSound": ""
+    },
+    {
+      "id": 2,
+      "title": "Listen and Choose Level 2",
+      "titleAr": "اسمع واختار - مستوى ٢",
+      "type": "listen_choose",
+      "level": 2,
+      "questionText": "Show me the red apple",
+      "questionTextAr": "وريني التفاحة الحمرا",
+      "questionAudio": "",
+      "options": [
+        {
+          "id": 1,
+          "text": "Apple",
+          "textAr": "تفاحة حمرا",
+          "image": "http://localhost:5000/uploads/1777506684109.jpg",
+          "isCorrect": true
+        },
+        {
+          "id": 2,
+          "text": "Banana",
+          "textAr": "موزة",
+          "image": "http://localhost:5000/uploads/1777506720506.jpg",
+          "isCorrect": false
+        },
+        {
+          "id": 3,
+          "text": "Green Apple",
+          "textAr": "تفاحة خضرا",
+          "image": "http://localhost:5000/uploads/1777506684109.jpg",
+          "isCorrect": false
+        }
+      ],
+      "successSound": "",
+      "failSound": ""
+    },
+    {
+      "id": 3,
+      "title": "Drag and Drop Demo",
+      "titleAr": "لعبة السحب والإفلات (تجربة)",
+      "type": "action_drag_drop",
+      "level": 1,
+      "instructionText": "اجعل الطفل يشم الوردة",
+      "instructionAudio": "",
+      "targetImage": "https://placehold.co/400x400/e2e8f0/475569?text=Child",
+      "items": [
+        {
+          "id": 1,
+          "image": "https://placehold.co/200x200/fecdd3/e11d48?text=Flower",
+          "isCorrect": true
+        },
+        {
+          "id": 2,
+          "image": "https://placehold.co/200x200/bfdbfe/2563eb?text=Ball",
+          "isCorrect": false
+        }
+      ],
+      "successSound": "",
+      "failSound": ""
+    }
+  ]
+}

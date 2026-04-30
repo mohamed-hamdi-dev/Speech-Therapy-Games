@@ -1,0 +1,235 @@
+const prisma = require('../config/prisma');
+const ApiError = require('../utils/apiError');
+const { generateUniqueAccessCode } = require('../utils/accessCode');
+
+function canAccessStudent(currentUser, student) {
+  if (currentUser.role === 'SUPER_ADMIN') {
+    return true;
+  }
+
+  return student.therapistId === currentUser.userId;
+}
+
+function mapStudent(student) {
+  return {
+    ...student,
+    assignedGames: student.assignedGames?.map((assignment) => assignment.game) || [],
+  };
+}
+
+async function ensureTherapistExists(therapistId) {
+  const therapist = await prisma.user.findFirst({
+    where: {
+      id: therapistId,
+      role: { in: ['THERAPIST', 'SUPER_ADMIN'] },
+      isActive: true,
+    },
+  });
+
+  if (!therapist) {
+    throw new ApiError(400, 'Therapist not found or inactive.');
+  }
+}
+
+async function ensureGamesExist(assignedGameIds = []) {
+  if (!assignedGameIds.length) {
+    return;
+  }
+
+  const games = await prisma.game.findMany({
+    where: {
+      id: { in: assignedGameIds },
+    },
+    select: { id: true },
+  });
+
+  if (games.length !== assignedGameIds.length) {
+    throw new ApiError(400, 'One or more assigned games are invalid.');
+  }
+}
+
+async function listStudents(currentUser) {
+  const where =
+    currentUser.role === 'SUPER_ADMIN'
+      ? {}
+      : {
+          therapistId: currentUser.userId,
+        };
+
+  const students = await prisma.student.findMany({
+    where,
+    include: {
+      therapist: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      assignedGames: {
+        include: {
+          game: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return students.map(mapStudent);
+}
+
+async function createStudent(currentUser, payload) {
+  const therapistId =
+    currentUser.role === 'SUPER_ADMIN' ? payload.therapistId : currentUser.userId;
+
+  await ensureTherapistExists(therapistId);
+  await ensureGamesExist(payload.assignedGameIds || []);
+
+  const accessCode = await generateUniqueAccessCode(payload.name);
+  const student = await prisma.student.create({
+    data: {
+      name: payload.name,
+      age: payload.age,
+      diagnosis: payload.diagnosis || null,
+      currentLevel: payload.currentLevel ?? 1,
+      accessCode,
+      therapistId,
+      assignedGames: {
+        create: (payload.assignedGameIds || []).map((gameId) => ({
+          gameId,
+        })),
+      },
+    },
+    include: {
+      therapist: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      assignedGames: {
+        include: {
+          game: true,
+        },
+      },
+    },
+  });
+
+  return mapStudent(student);
+}
+
+async function updateStudent(currentUser, studentId, payload) {
+  const existingStudent = await prisma.student.findUnique({
+    where: { id: studentId },
+    include: {
+      assignedGames: true,
+    },
+  });
+
+  if (!existingStudent) {
+    throw new ApiError(404, 'Student not found.');
+  }
+
+  if (!canAccessStudent(currentUser, existingStudent)) {
+    throw new ApiError(403, 'You can only manage your own students.');
+  }
+
+  const therapistId =
+    currentUser.role === 'SUPER_ADMIN'
+      ? payload.therapistId || existingStudent.therapistId
+      : existingStudent.therapistId;
+
+  await ensureTherapistExists(therapistId);
+  await ensureGamesExist(payload.assignedGameIds || []);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.student.update({
+      where: { id: studentId },
+      data: {
+        name: payload.name ?? existingStudent.name,
+        age: payload.age ?? existingStudent.age,
+        diagnosis: payload.diagnosis ?? existingStudent.diagnosis,
+        currentLevel: payload.currentLevel ?? existingStudent.currentLevel,
+        therapistId,
+      },
+    });
+
+    if (Array.isArray(payload.assignedGameIds)) {
+      await tx.studentGame.deleteMany({
+        where: { studentId },
+      });
+
+      if (payload.assignedGameIds.length) {
+        await tx.studentGame.createMany({
+          data: payload.assignedGameIds.map((gameId) => ({
+            studentId,
+            gameId,
+          })),
+        });
+      }
+    }
+
+    return tx.student.findUnique({
+      where: { id: studentId },
+      include: {
+        therapist: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        assignedGames: {
+          include: {
+            game: true,
+          },
+        },
+      },
+    });
+  });
+
+  return mapStudent(updated);
+}
+
+async function deleteStudent(currentUser, studentId) {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+  });
+
+  if (!student) {
+    throw new ApiError(404, 'Student not found.');
+  }
+
+  if (!canAccessStudent(currentUser, student)) {
+    throw new ApiError(403, 'You can only delete your own students.');
+  }
+
+  await prisma.student.delete({
+    where: { id: studentId },
+  });
+}
+
+async function findStudentForSession(currentUser, studentId) {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+  });
+
+  if (!student) {
+    throw new ApiError(404, 'Student not found.');
+  }
+
+  if (!canAccessStudent(currentUser, student)) {
+    throw new ApiError(403, 'You can only access your own students.');
+  }
+
+  return student;
+}
+
+module.exports = {
+  listStudents,
+  createStudent,
+  updateStudent,
+  deleteStudent,
+  findStudentForSession,
+};
