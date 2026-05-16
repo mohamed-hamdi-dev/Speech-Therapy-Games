@@ -109,7 +109,7 @@ const StudentLayout = () => {
       )}
 
       <aside
-        className={`fixed right-0 top-[72px] z-40 border-l-2 border-b-2 border-[#c8dced] bg-white/95 backdrop-blur-md transition-all
+        className={`fixed right-0 top-[72px] z-30 border-l-2 border-b-2 border-[#c8dced] bg-white/95 backdrop-blur-md transition-all
           lg:top-[72px] lg:bottom-4 lg:w-[74px] lg:rounded-bl-[2.5rem]
           ${mobileNavOpen ? 'bottom-0 w-[78vw] max-w-[320px] opacity-100 translate-x-0' : 'bottom-0 w-[78vw] max-w-[320px] opacity-0 translate-x-full pointer-events-none'}
           lg:opacity-100 lg:translate-x-0 lg:pointer-events-auto`}
@@ -156,7 +156,7 @@ const StudentLayout = () => {
       </aside>
 
       <main className="pt-[96px] transition-all mr-0 lg:mr-[74px]">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-5">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 pt-5 pb-24 md:pb-8">
           <Outlet />
         </div>
       </main>

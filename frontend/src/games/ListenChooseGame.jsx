@@ -56,7 +56,7 @@ const ListenChooseGame = ({
 
   return (
     <div className="flex flex-col items-center">
-      <Card className="w-full mb-5 p-5 md:p-6 text-center bg-[#f7fbff] border-[#dbe7f3] rounded-[2rem]">
+      <Card className="w-full mb-4 md:mb-5 p-4 md:p-6 text-center bg-[#f7fbff] border-[#dbe7f3] rounded-[1.4rem] md:rounded-[2rem]">
         <button
           type="button"
           onClick={() => {
@@ -74,26 +74,26 @@ const ListenChooseGame = ({
         >
           <Volume2 size={32} className="text-white" />
         </button>
-        <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-relaxed">
+        <h2 className="text-xl md:text-3xl font-black text-slate-900 leading-relaxed">
           {game.questionTextAr}
         </h2>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-3xl">
+      <div className="grid grid-cols-2 gap-3 md:gap-5 w-full max-w-3xl">
         {game.options.map((option) => (
           <Card
             key={option.id}
             onClick={() => handleOptionSelect(option)}
-            className={`p-4 md:p-5 cursor-pointer rounded-[2rem] border-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+            className={`p-3 md:p-5 cursor-pointer rounded-[1.2rem] md:rounded-[2rem] border-2 md:border-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
               selectedOption?.id === option.id ? 'border-blue-300' : 'border-transparent'
             }`}
           >
             <img
               src={option.image}
               alt={option.textAr}
-              className="w-full h-44 md:h-52 object-contain bg-white rounded-[1.5rem] mb-3 pointer-events-none"
+              className="w-full h-32 md:h-52 object-contain bg-white rounded-[1rem] md:rounded-[1.5rem] mb-2 md:mb-3 pointer-events-none"
             />
-            <h3 className="text-2xl md:text-3xl font-black text-center text-slate-900 pointer-events-none">
+            <h3 className="text-xl md:text-3xl font-black text-center text-slate-900 pointer-events-none">
               {option.textAr}
             </h3>
           </Card>

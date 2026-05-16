@@ -57,7 +57,7 @@ const MatchingGame = ({
             ? 'grid-cols-2 md:grid-cols-2 max-w-3xl mx-auto'
             : 'grid-cols-2 md:grid-cols-3 max-w-5xl mx-auto'
     : options.length <= 2
-      ? 'md:grid-cols-2 max-w-3xl mx-auto'
+      ? 'grid-cols-2 max-w-3xl mx-auto'
       : 'grid-cols-2 md:grid-cols-2 xl:grid-cols-3';
 
   useEffect(() => {
@@ -108,7 +108,7 @@ const MatchingGame = ({
 
   return (
     <div className="space-y-6" dir="rtl">
-      <Card className="w-full p-5 md:p-6 text-center bg-white border-[#dbe7f3] rounded-[2rem]">
+      <Card className="w-full p-4 md:p-6 text-center bg-white border-[#dbe7f3] rounded-[1.4rem] md:rounded-[2rem]">
         <button
           type="button"
           onClick={playInstruction}
@@ -119,20 +119,20 @@ const MatchingGame = ({
           <Volume2 size={32} className="text-white" />
         </button>
 
-        <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-relaxed">
+        <h2 className="text-xl md:text-3xl font-black text-slate-900 leading-relaxed">
           {instructionAr}
         </h2>
 
         {!isFindMode && (
-          <div className={`mt-6 rounded-[2rem] bg-white border border-[#dbe7f3] p-4 mx-auto ${isDifferentMode ? 'max-w-xs' : 'max-w-sm'}`}>
+          <div className={`mt-4 md:mt-6 rounded-[1.4rem] md:rounded-[2rem] bg-white border border-[#dbe7f3] p-3 md:p-4 mx-auto ${isDifferentMode ? 'max-w-xs' : 'max-w-sm'}`}>
           {heroImage ? (
             <img
               src={heroImage}
               alt={game?.titleAr || game?.name || 'Hero'}
-              className="w-full h-44 md:h-56 object-contain rounded-[1.5rem]"
+              className="w-full h-36 md:h-56 object-contain rounded-[1rem] md:rounded-[1.5rem]"
             />
           ) : (
-            <div className="w-full h-44 md:h-56 rounded-[1.5rem] bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 font-black text-center px-4 leading-7">
+            <div className="w-full h-36 md:h-56 rounded-[1rem] md:rounded-[1.5rem] bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 font-black text-center px-4 leading-7">
               الصورة الرئيسية
             </div>
           )}
@@ -140,12 +140,12 @@ const MatchingGame = ({
         )}
       </Card>
 
-      <div className={`grid gap-5 w-full ${gridClassName}`}>
+      <div className={`grid gap-3 md:gap-5 w-full ${gridClassName}`}>
         {options.map((option, index) => (
           <Card
             key={option.id || index}
             onClick={() => handleOptionSelect(option)}
-            className={`p-4 md:p-5 cursor-pointer rounded-[2rem] border-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+            className={`p-3 md:p-5 cursor-pointer rounded-[1.2rem] md:rounded-[2rem] border-2 md:border-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
               selectedOption?.id === option.id ? 'border-blue-300' : 'border-transparent'
             }`}
           >
@@ -153,16 +153,16 @@ const MatchingGame = ({
               <img
                 src={option.image}
                 alt={option.textAr || `option-${index + 1}`}
-                className="w-full h-44 md:h-52 object-contain bg-white rounded-[1.5rem] mb-3 pointer-events-none"
+                className="w-full h-32 md:h-52 object-contain bg-white rounded-[1rem] md:rounded-[1.5rem] mb-2 md:mb-3 pointer-events-none"
               />
             ) : (
-              <div className="w-full h-44 md:h-52 bg-slate-100 rounded-[1.5rem] mb-3 border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 font-black pointer-events-none text-center px-4 leading-7">
+              <div className="w-full h-32 md:h-52 bg-slate-100 rounded-[1rem] md:rounded-[1.5rem] mb-2 md:mb-3 border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 font-black pointer-events-none text-center px-4 leading-7">
                 صورة الاختيار
               </div>
             )}
 
             {!!option.textAr && (
-              <h3 className="text-xl md:text-2xl font-black text-center text-slate-900 pointer-events-none">
+              <h3 className="text-lg md:text-2xl font-black text-center text-slate-900 pointer-events-none">
                 {option.textAr}
               </h3>
             )}
