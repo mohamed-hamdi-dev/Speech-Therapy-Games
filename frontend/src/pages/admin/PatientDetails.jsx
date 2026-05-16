@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  ArrowRight,
   BookOpen,
   Brain,
   CalendarDays,
@@ -296,7 +297,14 @@ const PatientDetails = () => {
                 تعديل البيانات
               </Button>
             )}
-            <Button variant="outline" onClick={() => navigate('/admin/patients')}>العودة للمرضى</Button>
+            <Button
+              variant="outline"
+              className="border-red-500 text-red-600 hover:bg-red-50 hover:border-red-600"
+              onClick={() => navigate('/admin/patients')}
+            >
+              <ArrowRight size={16} />
+              العودة للمرضى
+            </Button>
           </div>
         </div>
 

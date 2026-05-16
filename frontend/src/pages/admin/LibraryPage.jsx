@@ -1,17 +1,25 @@
 ﻿import React from 'react';
 import { BookOpenCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import Button from '../../components/Button';
 import { mockLibraryItems } from '../../data/patientWorkspaceMock';
 
 const LibraryPage = () => {
+  const navigate = useNavigate();
+
   return (
     <section className="space-y-5" dir="rtl">
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl sm:text-4xl font-black text-slate-900 flex items-center gap-2">
           <BookOpenCheck className="text-blue-700" />
           المكتبة العلاجية
         </h1>
-        <p className="text-slate-600 mt-2">مكتبة مؤقتة للأنشطة والقوالب لحين ربط الـbackend.</p>
+        <Button variant="outline" className="!py-3" onClick={() => navigate('/admin/curriculum')}>
+          فتح المنهج
+        </Button>
       </div>
+
+      <p className="text-slate-600">مكتبة مؤقتة للأنشطة والقوالب لحين ربط الـbackend.</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {mockLibraryItems.map((item) => (

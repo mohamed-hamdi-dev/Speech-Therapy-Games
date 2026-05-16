@@ -36,9 +36,9 @@ const StudentLogin = () => {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[linear-gradient(180deg,_#eef8fb,_#f7fcfd_46%,_#ffffff_100%)] flex items-start justify-center p-4">
-      <div className="w-full max-w-[72rem] grid lg:grid-cols-[1.02fr_0.98fr] gap-4">
-        <section className="bg-white/95 rounded-[2rem] p-6 md:p-7 border border-[#b8deec] shadow-[0_18px_60px_rgba(19,143,188,0.10)]">
+    <div dir="rtl" className="min-h-screen bg-[linear-gradient(180deg,_#eef8fb,_#f7fcfd_46%,_#ffffff_100%)] flex items-center justify-center p-4 md:p-6">
+      <div className="w-full max-w-[56rem] grid lg:grid-cols-[1fr_0.9fr] gap-4">
+        <section className="bg-white/95 rounded-[2rem] p-5 md:p-6 border border-[#b8deec] shadow-[0_18px_60px_rgba(19,143,188,0.10)]">
           <div className="flex items-start justify-end gap-4 mb-6">
             <div className="flex items-center gap-3 rounded-[1.4rem] bg-[#f7fbff] border border-[#dbe7f3] px-4 py-3 shadow-sm">
               <div className="w-12 h-12 rounded-[1rem] bg-white border border-[#dbe7f3] shadow-sm flex items-center justify-center overflow-hidden p-1">
@@ -51,10 +51,10 @@ const StudentLogin = () => {
             </div>
           </div>
 
-          <h2 className="text-[2.6rem] md:text-[3rem] font-extrabold text-slate-900 leading-[1.08] mb-3">
+          <h2 className="text-[2.15rem] md:text-[2.45rem] font-extrabold text-slate-900 leading-[1.08] mb-3">
             دخول المستفيد فقط
           </h2>
-          <p className="text-lg md:text-[1.1rem] text-slate-600 mb-6 leading-8 max-w-3xl">
+          <p className="text-base md:text-[1rem] text-slate-600 mb-5 leading-7 max-w-2xl">
             لا نطلب كلمة مرور أو PIN. أدخل كود الدخول ثم ابدأ الأنشطة العلاجية والألعاب المخصصة مباشرة.
           </p>
 
@@ -72,7 +72,7 @@ const StudentLogin = () => {
                   if (error) setError('');
                 }}
                 placeholder="AHMED123"
-                className="w-full rounded-[1.5rem] border-2 border-[#d3e3f8] bg-[#fbfdff] px-6 py-3.5 text-center text-2xl tracking-[0.16em] font-black text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 uppercase"
+                className="w-full rounded-[1.5rem] border-2 border-[#d3e3f8] bg-[#fbfdff] px-6 py-3 text-center text-xl tracking-[0.14em] font-black text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 uppercase"
               />
             </label>
 
@@ -96,7 +96,7 @@ const StudentLogin = () => {
               type="submit"
               variant="primary"
               disabled={submitting}
-              className="w-full !rounded-[1.5rem] !py-3.5 text-xl bg-blue-600 hover:bg-blue-700"
+              className="w-full !rounded-[1.5rem] !py-3 text-lg bg-blue-600 hover:bg-blue-700"
             >
               دخول المستفيد
             </Button>
@@ -113,7 +113,7 @@ const StudentLogin = () => {
           </div>
         </section>
 
-        <aside className="relative overflow-hidden rounded-[2rem] border border-[#8ecfe2] bg-[linear-gradient(180deg,_#0f7ea6,_#138fbc_44%,_#45abd0_100%)] p-5 md:p-6 text-white shadow-[0_24px_60px_rgba(19,143,188,0.24)]">
+        <aside className="relative overflow-hidden rounded-[2rem] border border-[#8ecfe2] bg-[linear-gradient(180deg,_#0f7ea6,_#138fbc_44%,_#45abd0_100%)] p-4 md:p-5 text-white shadow-[0_24px_60px_rgba(19,143,188,0.24)]">
           <div className="absolute -top-16 -left-12 h-48 w-48 rounded-full bg-white/12 blur-2xl" />
           <div className="absolute bottom-10 right-0 h-44 w-44 rounded-full bg-[#fff0ba]/18 blur-3xl" />
 

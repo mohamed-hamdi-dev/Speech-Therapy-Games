@@ -8,6 +8,7 @@ import RoleRoute from '../components/RoleRoute';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import AdminLogin from '../pages/admin/AdminLogin';
 import CreateGame from '../pages/admin/CreateGame';
+import CurriculumPage from '../pages/admin/CurriculumPage';
 import EditGame from '../pages/admin/EditGame';
 import GamesManager from '../pages/admin/GamesManager';
 import LibraryPage from '../pages/admin/LibraryPage';
@@ -69,6 +70,7 @@ const AppRoutes = () => {
         <Route path="patients/edit/:studentId" element={<StudentForm mode="edit" />} />
         <Route path="patients/:id" element={<PatientDetails />} />
         <Route path="library" element={<LibraryPage />} />
+        <Route path="curriculum" element={<CurriculumPage />} />
 
         <Route path="games" element={<GamesManager />} />
         <Route path="games/create" element={<CreateGame />} />

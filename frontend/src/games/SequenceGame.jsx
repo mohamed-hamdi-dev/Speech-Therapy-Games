@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   MouseSensor,
@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core';
 import confetti from 'canvas-confetti';
 import { Volume2 } from 'lucide-react';
+import FeedbackModal from '../components/FeedbackModal';
 import { playAudioUrl, playErrorSound, playSuccessSound } from '../utils/soundEffects';
 
 const preventKeyboardAudioTrigger = (event) => {
@@ -53,9 +54,7 @@ function DraggableSequenceItem({ item, index }) {
           صورة الخطوة
         </div>
       )}
-      {item.labelAr && (
-        <div className="text-center text-sm font-bold text-slate-700 mt-1 truncate px-1">{item.labelAr}</div>
-      )}
+      {item.labelAr && <div className="text-center text-sm font-bold text-slate-700 mt-1 truncate px-1">{item.labelAr}</div>}
     </div>
   );
 }
@@ -88,9 +87,7 @@ function DroppableSlot({ slotIndex, placedItem }) {
               صورة
             </div>
           )}
-          {placedItem.labelAr && (
-            <div className="text-center text-xs font-bold text-slate-700 mt-1 truncate">{placedItem.labelAr}</div>
-          )}
+          {placedItem.labelAr && <div className="text-center text-xs font-bold text-slate-700 mt-1 truncate">{placedItem.labelAr}</div>}
         </div>
       ) : (
         <div className="text-3xl text-slate-300">+</div>
@@ -112,18 +109,15 @@ const SequenceGame = ({
   const [attempts, setAttempts] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [startTime] = useState(Date.now());
 
   const instructionAr =
     config?.content?.instructionAr || game?.questionTextAr || game?.instructionTextAr || game?.instructionText || 'رتب الخطوات';
   const instructionAudio = config?.content?.instructionAudio || game?.questionAudio || game?.instructionAudio || '';
   const steps = useMemo(() => {
-    if (Array.isArray(config?.content?.steps)) {
-      return config.content.steps;
-    }
-    if (Array.isArray(game?.items)) {
-      return game.items;
-    }
+    if (Array.isArray(config?.content?.steps)) return config.content.steps;
+    if (Array.isArray(game?.items)) return game.items;
     return [];
   }, [config, game]);
 
@@ -143,44 +137,42 @@ const SequenceGame = ({
 
     setCompleted(false);
     setFeedback(null);
+    setShowFeedback(false);
     setAttempts(0);
     setPlacedItems(new Array(steps.length).fill(null));
     setAvailableItems([...steps].sort(() => Math.random() - 0.5));
 
-    if (instructionAudio) {
-      playAudioUrl(instructionAudio);
-    }
+    if (instructionAudio) playAudioUrl(instructionAudio);
   }, [steps, instructionAudio]);
 
   const resetBoard = useCallback(() => {
     setCompleted(false);
     setFeedback(null);
+    setShowFeedback(false);
     setPlacedItems(new Array(steps.length).fill(null));
     setAvailableItems([...steps].sort(() => Math.random() - 0.5));
   }, [steps]);
 
   const checkCompletion = useCallback(
     (placed) => {
-      if (placed.some((item) => item === null)) {
-        return;
-      }
+      if (placed.some((item) => item === null)) return;
 
-      setAttempts((current) => current + 1);
+      const nextAttempt = attempts + 1;
+      setAttempts(nextAttempt);
+
       const isCorrectOrder = placed.every((item, index) => Number(item.order) === index + 1);
 
       if (!isCorrectOrder) {
         setFeedback('error');
+        setShowFeedback(true);
         if (failSound) playAudioUrl(failSound);
         else playErrorSound();
-
-        setTimeout(() => {
-          resetBoard();
-        }, 1800);
         return;
       }
 
       setCompleted(true);
       setFeedback('success');
+      setShowFeedback(true);
       if (successSound) playAudioUrl(successSound);
       else playSuccessSound();
 
@@ -190,60 +182,51 @@ const SequenceGame = ({
         origin: { y: 0.55 },
         colors: ['#2563eb', '#f59e0b', '#10b981', '#ec4899'],
       });
-
-      setTimeout(() => {
-        if (previewMode) {
-          resetBoard();
-          return;
-        }
-
-        const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-        onComplete({
-          correctAnswers: 1,
-          wrongAnswers: Math.max(attempts, 0),
-          attempts: [attempts + 1],
-          prompts: [therapistControlsEnabled ? therapistPromptLevel : 'none'],
-          timeSpent,
-        });
-      }, 2200);
     },
-    [
-      attempts,
-      failSound,
-      onComplete,
-      previewMode,
-      resetBoard,
-      startTime,
-      successSound,
-      therapistControlsEnabled,
-      therapistPromptLevel,
-    ]
+    [attempts, failSound, successSound]
   );
 
-  const handleDragEnd = ({ active, over }) => {
-    if (!over || completed) {
+  const handleFeedbackNext = () => {
+    setShowFeedback(false);
+
+    if (feedback === 'error') {
+      resetBoard();
       return;
     }
 
-    const slotMatch = String(over.id).match(/^slot-(\d+)$/);
-    if (!slotMatch) {
+    if (feedback !== 'success') return;
+
+    if (previewMode) {
+      resetBoard();
       return;
     }
+
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+    onComplete({
+      correctAnswers: 1,
+      wrongAnswers: Math.max(attempts - 1, 0),
+      attempts: [attempts],
+      prompts: [therapistControlsEnabled ? therapistPromptLevel : 'none'],
+      timeSpent,
+    });
+  };
+
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || completed) return;
+
+    const slotMatch = String(over.id).match(/^slot-(\d+)$/);
+    if (!slotMatch) return;
 
     const slotIndex = Number(slotMatch[1]);
     const draggedItem = active.data.current?.item;
-    if (!draggedItem || placedItems[slotIndex] !== null) {
-      return;
-    }
+    if (!draggedItem || placedItems[slotIndex] !== null) return;
 
     const nextPlacedItems = [...placedItems];
     nextPlacedItems[slotIndex] = draggedItem;
     setPlacedItems(nextPlacedItems);
     setAvailableItems((current) => current.filter((item) => item.id !== draggedItem.id));
 
-    if (!nextPlacedItems.some((item) => item === null)) {
-      checkCompletion(nextPlacedItems);
-    }
+    if (!nextPlacedItems.some((item) => item === null)) checkCompletion(nextPlacedItems);
   };
 
   return (
@@ -255,9 +238,7 @@ const SequenceGame = ({
         <button
           type="button"
           onClick={() => {
-            if (instructionAudio) {
-              playAudioUrl(instructionAudio);
-            }
+            if (instructionAudio) playAudioUrl(instructionAudio);
           }}
           onKeyDown={preventKeyboardAudioTrigger}
           onKeyUp={preventKeyboardAudioTrigger}
@@ -289,21 +270,13 @@ const SequenceGame = ({
         )}
       </DndContext>
 
-      {feedback === 'success' && (
-        <div className="fixed inset-0 bg-green-500/20 backdrop-blur-sm z-40 flex items-center justify-center pointer-events-none">
-          <div className="text-5xl md:text-7xl font-black text-green-600 bg-white/90 px-10 py-6 rounded-[3rem] shadow-2xl animate-bounce">
-            ممتاز!
-          </div>
-        </div>
-      )}
-
-      {feedback === 'error' && (
-        <div className="fixed inset-0 bg-red-500/10 backdrop-blur-sm z-40 flex items-center justify-center pointer-events-none">
-          <div className="text-4xl md:text-5xl font-black text-red-600 bg-white/90 px-10 py-6 rounded-[3rem] shadow-2xl">
-            حاول مرة أخرى
-          </div>
-        </div>
-      )}
+      <FeedbackModal
+        show={showFeedback}
+        isCorrect={feedback === 'success'}
+        onNext={handleFeedbackNext}
+        successSound={successSound}
+        failSound={failSound}
+      />
     </div>
   );
 };
