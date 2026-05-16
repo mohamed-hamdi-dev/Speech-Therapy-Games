@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Bell,
   BookOpen,
   CalendarDays,
   FileText,
@@ -65,7 +66,7 @@ const StudentLayout = () => {
 
   return (
     <div dir="rtl" className="relative min-h-screen  bg-[radial-gradient(circle_at_top,_#eaf7fb,_#f7fcfd_34%,_#ffffff_75%)] text-slate-800 font-arabic">
-      <header className="fixed top-0 inset-x-0 z-40 border-b border-[#dbe7f3] bg-white/95 backdrop-blur-md shadow-[0_8px_20px_rgba(15,23,42,0.08)] mb-[2em]">
+      <header className="fixed top-0 left-0 right-0 lg:right-[74px] z-40 border-b border-[#dbe7f3] bg-white/95 backdrop-blur-md shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
         <div className="w-full px-4 md:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
@@ -83,7 +84,12 @@ const StudentLayout = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 rounded-2xl border border-[#dbe7f3] bg-white px-4 py-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            <button className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50 transition-colors relative border border-slate-200 bg-white">
+              <Bell size={18} />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
+            </button>
+            <div className="flex items-center gap-3 rounded-2xl border border-[#dbe7f3] bg-white px-4 py-2 shadow-sm">
             <div className="text-right">
               <div className="text-xs text-slate-500 font-bold">{activeMode === 'therapist' ? 'جلسة علاجية' : 'المستفيد'}</div>
               <div className="font-black text-slate-900">{currentStudent?.name}</div>
@@ -96,6 +102,7 @@ const StudentLayout = () => {
               )}
             </div>
           </div>
+          </div>
         </div>
       </header>
 
@@ -104,17 +111,23 @@ const StudentLayout = () => {
           type="button"
           aria-label="إغلاق القائمة"
           onClick={() => setMobileNavOpen(false)}
-          className="lg:hidden fixed inset-0 top-[72px] bg-slate-900/20 z-30"
+          className="lg:hidden fixed inset-0 top-[86px] bg-slate-900/35 backdrop-blur-[1px] z-30"
         />
       )}
 
       <aside
-        className={`fixed right-0 top-[72px] z-30 border-l-2 border-b-2 border-[#c8dced] bg-white/95 backdrop-blur-md transition-all
-          lg:top-[72px] lg:bottom-4 lg:w-[74px] lg:rounded-bl-[2.5rem]
+        className={`fixed right-0 top-[86px] z-30 border-l-2 border-b-2 border-[#c8dced] bg-white/95 backdrop-blur-md transition-all
+          lg:top-0 lg:bottom-4 lg:w-[74px] lg:rounded-bl-[2.5rem]
           ${mobileNavOpen ? 'bottom-0 w-[78vw] max-w-[320px] opacity-100 translate-x-0' : 'bottom-0 w-[78vw] max-w-[320px] opacity-0 translate-x-full pointer-events-none'}
           lg:opacity-100 lg:translate-x-0 lg:pointer-events-auto`}
       >
-        <nav className="h-full flex flex-col p-2 pt-5 gap-1 overflow-visible">
+        <nav className="h-full flex flex-col p-2 pt-5 lg:pt-6 gap-1 overflow-visible">
+          <div className="hidden lg:flex items-center justify-center mb-2">
+            <div className="w-12 h-12 rounded-2xl border border-[#dbe7f3] bg-white/85 flex items-center justify-center shadow-sm">
+              <img src="/logo.png" alt="logo" className="w-8 h-8 object-contain opacity-90" />
+            </div>
+          </div>
+
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -155,7 +168,7 @@ const StudentLayout = () => {
         </nav>
       </aside>
 
-      <main className="pt-[96px] transition-all mr-0 lg:mr-[74px]">
+      <main className="pt-[104px] transition-all mr-0 lg:mr-[74px]">
         <div className="max-w-6xl mx-auto px-4 md:px-6 pt-5 pb-24 md:pb-8">
           <Outlet />
         </div>
