@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
+const env = require('../config/env');
 const ApiError = require('../utils/apiError');
 
 function sanitizeTherapist(user) {
@@ -9,10 +10,13 @@ function sanitizeTherapist(user) {
     email: user.email,
     role: user.role,
     isActive: user.isActive,
+    isBootstrapAccount: user.email?.toLowerCase() === env.superAdminEmail.toLowerCase(),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
 }
+
+const MANAGED_ROLES = ['THERAPIST', 'SUPER_ADMIN'];
 
 async function createTherapist(payload) {
   const existingUser = await prisma.user.findUnique({
@@ -24,12 +28,13 @@ async function createTherapist(payload) {
   }
 
   const hashedPassword = await bcrypt.hash(payload.password, 10);
+  const nextRole = payload.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'THERAPIST';
   const therapist = await prisma.user.create({
     data: {
       name: payload.name,
       email: payload.email.toLowerCase(),
       password: hashedPassword,
-      role: 'THERAPIST',
+      role: nextRole,
       isActive: payload.isActive ?? true,
     },
   });
@@ -39,8 +44,8 @@ async function createTherapist(payload) {
 
 async function listTherapists() {
   const therapists = await prisma.user.findMany({
-    where: { role: 'THERAPIST' },
-    orderBy: { createdAt: 'desc' },
+    where: { role: { in: MANAGED_ROLES } },
+    orderBy: [{ role: 'asc' }, { createdAt: 'desc' }],
   });
 
   return therapists.map(sanitizeTherapist);
@@ -48,11 +53,11 @@ async function listTherapists() {
 
 async function updateTherapist(therapistId, payload) {
   const therapist = await prisma.user.findFirst({
-    where: { id: therapistId, role: 'THERAPIST' },
+    where: { id: therapistId, role: { in: MANAGED_ROLES } },
   });
 
   if (!therapist) {
-    throw new ApiError(404, 'Therapist not found.');
+    throw new ApiError(404, 'لم يتم العثور على الدكتور.');
   }
 
   if (payload.email && payload.email.toLowerCase() !== therapist.email) {
@@ -69,6 +74,7 @@ async function updateTherapist(therapistId, payload) {
     name: payload.name ?? therapist.name,
     email: payload.email ? payload.email.toLowerCase() : therapist.email,
     isActive: payload.isActive ?? therapist.isActive,
+    role: payload.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : payload.role === 'THERAPIST' ? 'THERAPIST' : therapist.role,
   };
 
   if (payload.password) {
@@ -85,11 +91,15 @@ async function updateTherapist(therapistId, payload) {
 
 async function deactivateTherapist(therapistId) {
   const therapist = await prisma.user.findFirst({
-    where: { id: therapistId, role: 'THERAPIST' },
+    where: { id: therapistId, role: { in: MANAGED_ROLES } },
   });
 
   if (!therapist) {
-    throw new ApiError(404, 'Therapist not found.');
+    throw new ApiError(404, 'لم يتم العثور على الدكتور.');
+  }
+
+  if (therapist.role === 'SUPER_ADMIN') {
+    throw new ApiError(400, 'Super admin cannot be deactivated.');
   }
 
   const updated = await prisma.user.update({

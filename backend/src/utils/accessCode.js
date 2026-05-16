@@ -1,4 +1,4 @@
-const prisma = require('../config/prisma');
+﻿const prisma = require('../config/prisma');
 
 function randomSegment(length) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -11,12 +11,12 @@ function randomSegment(length) {
   return value;
 }
 
-async function generateUniqueAccessCode(name = 'STUDENT') {
+async function generateUniqueAccessCode(name = 'PATIENT') {
   const prefix = name
     .toUpperCase()
     .replace(/[^A-Z]/g, '')
-    .slice(0, 5)
-    .padEnd(5, 'X');
+    .slice(0, 4)
+    .padEnd(4, 'X');
 
   let code = '';
   let exists = true;

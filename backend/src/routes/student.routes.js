@@ -1,17 +1,18 @@
-const express = require('express');
+﻿const express = require('express');
 const { body, param } = require('express-validator');
 const {
   getStudents,
   createStudent,
   updateStudent,
   deleteStudent,
+  regenerateAccessCode,
 } = require('../controllers/student.controller');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const { validateRequest } = require('../middleware/validate.middleware');
 
 const router = express.Router();
 
-router.use(authenticate, authorize('SUPER_ADMIN', 'THERAPIST'));
+router.use('/api/students', authenticate, authorize('SUPER_ADMIN', 'THERAPIST'));
 
 router.get('/api/students', getStudents);
 
@@ -44,6 +45,12 @@ router.put(
     validateRequest,
   ],
   updateStudent
+);
+
+router.patch(
+  '/api/students/:id/access-code',
+  [param('id').notEmpty().withMessage('Student id is required.'), validateRequest],
+  regenerateAccessCode
 );
 
 router.delete(

@@ -1,6 +1,6 @@
-const express = require('express');
+﻿const express = require('express');
 const { body } = require('express-validator');
-const { login, studentLogin } = require('../controllers/auth.controller');
+const { login, studentLogin, patientLogin } = require('../controllers/auth.controller');
 const { validateRequest } = require('../middleware/validate.middleware');
 
 const router = express.Router();
@@ -22,6 +22,18 @@ router.post(
     validateRequest,
   ],
   studentLogin
+);
+
+router.post(
+  '/api/patient/login',
+  [
+    body('accessCode')
+      .trim()
+      .isLength({ min: 6, max: 8 })
+      .withMessage('Access code must be 6 to 8 characters long.'),
+    validateRequest,
+  ],
+  patientLogin
 );
 
 module.exports = router;

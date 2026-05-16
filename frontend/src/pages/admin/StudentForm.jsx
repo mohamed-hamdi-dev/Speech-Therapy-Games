@@ -1,71 +1,135 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
 import { ArrowRight, Save, UserRoundPlus } from 'lucide-react';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import { useTherapyStore } from '../../hooks/useTherapyStore';
-
-const avatarOptions = ['🙂', '🌟', '🦋', '🚗', '🧩', '🐥'];
+import gameService from '../../services/gameService';
+import therapistService from '../../services/therapistService';
 
 const defaultForm = {
   name: '',
-  nameAr: '',
   age: 4,
-  code: '',
-  avatar: '🙂',
-  goals: '',
-  assignedGames: [],
+  diagnosis: '',
+  currentLevel: 1,
+  therapistId: '',
+  assignedGameIds: [],
 };
 
 const StudentForm = ({ mode = 'create' }) => {
   const navigate = useNavigate();
   const { studentId } = useParams();
-  const { addStudent, students, updateStudent } = useTherapyStore();
+  const { addStudent, adminSession, fetchStudents, students, updateStudent } = useTherapyStore();
+
   const [formData, setFormData] = useState(defaultForm);
   const [availableGames, setAvailableGames] = useState([]);
+  const [therapists, setTherapists] = useState([]);
+  const [loadingGames, setLoadingGames] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [gamesFilter, setGamesFilter] = useState('');
 
   const isEdit = mode === 'edit';
-  const student = students.find((item) => item.id === Number(studentId));
+  const student = useMemo(
+    () => (Array.isArray(students) ? students.find((item) => String(item.id) === String(studentId)) : null),
+    [studentId, students]
+  );
+
+  const filteredGames = useMemo(() => {
+    const query = gamesFilter.trim().toLowerCase();
+    if (!query) {
+      return availableGames;
+    }
+
+    return availableGames.filter((game) => {
+      const searchableText = `${game.titleAr || ''} ${game.title || ''} ${game.name || ''} ${game.level || ''}`.toLowerCase();
+      return searchableText.includes(query);
+    });
+  }, [availableGames, gamesFilter]);
 
   useEffect(() => {
-    const fetchGames = async () => {
+    const fetchFormDependencies = async () => {
+      let nextError = '';
+
+      setLoadingGames(true);
+      setError('');
+
       try {
-        const response = await axios.get('http://localhost:5000/api/games');
-        setAvailableGames(response.data);
-      } catch (error) {
-        console.error('Error fetching games for student form:', error);
+        const gamesResponse = await gameService.getGames(adminSession?.token);
+        setAvailableGames(
+          Array.isArray(gamesResponse)
+            ? gamesResponse
+            : Array.isArray(gamesResponse?.data)
+              ? gamesResponse.data
+              : []
+        );
+      } catch (_gamesError) {
+        setAvailableGames([]);
+        nextError = 'تعذر تحميل الألعاب.';
       }
+
+      if (adminSession?.user?.role === 'SUPER_ADMIN' && adminSession?.token) {
+        const adminOption = adminSession?.user
+          ? [
+              {
+                id: adminSession.user.id,
+                name: adminSession.user.name || adminSession.name,
+                email: adminSession.user.email || adminSession.email,
+              },
+            ]
+          : [];
+
+        try {
+          const therapistsResponse = await therapistService.getTherapists(adminSession.token);
+          const therapistsData = Array.isArray(therapistsResponse?.data) ? therapistsResponse.data : [];
+          const mergedTherapists = [...adminOption, ...therapistsData].filter(
+            (therapist, index, array) => array.findIndex((item) => item.id === therapist.id) === index
+          );
+
+          setTherapists(mergedTherapists);
+          if (!isEdit) {
+            setFormData((current) => ({
+              ...current,
+              therapistId: current.therapistId || adminSession.user.id || mergedTherapists[0]?.id || '',
+            }));
+          }
+        } catch (_therapistsError) {
+          setTherapists(adminOption);
+          if (!isEdit) {
+            setFormData((current) => ({
+              ...current,
+              therapistId: current.therapistId || adminSession.user.id || adminOption[0]?.id || '',
+            }));
+          }
+          if (!nextError) {
+            nextError = 'تعذر تحميل قائمة الدكاترة.';
+          }
+        }
+      } else {
+        setTherapists([]);
+      }
+
+      setError(nextError);
+      setLoadingGames(false);
     };
 
-    fetchGames();
-  }, []);
+    fetchFormDependencies();
+  }, [adminSession?.email, adminSession?.name, adminSession?.token, adminSession?.user, isEdit]);
 
   useEffect(() => {
     if (isEdit && student) {
-      const normalizedAssignedGames = (student.assignedGames || []).flatMap((assignedGame) => {
-        const matches = availableGames.filter(
-          (game) => game.id === assignedGame || String(game.id) === String(assignedGame) || game.type === assignedGame
-        );
-
-        if (matches.length > 0) {
-          return matches.map((game) => String(game.id));
-        }
-
-        return String(assignedGame);
-      });
-
       setFormData({
         name: student.name || '',
-        nameAr: student.nameAr || '',
         age: student.age || 4,
-        code: student.code || '',
-        avatar: student.avatar || '🙂',
-        goals: (student.goals || []).join('، '),
-        assignedGames: normalizedAssignedGames,
+        diagnosis: student.diagnosis || '',
+        currentLevel: student.currentLevel || 1,
+        therapistId: student.therapistId || '',
+        assignedGameIds: Array.isArray(student.assignedGames)
+          ? student.assignedGames.map((game) => String(game.id))
+          : [],
       });
     }
-  }, [availableGames, isEdit, student]);
+  }, [isEdit, student]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -75,51 +139,56 @@ const StudentForm = ({ mode = 'create' }) => {
     }));
   };
 
-  const handleAssignedGamesChange = (event) => {
-    const selectedValues = Array.from(event.target.selectedOptions, (option) => option.value);
+  const toggleAssignedGame = (gameId) => {
     setFormData((current) => ({
       ...current,
-      assignedGames: selectedValues,
+      assignedGameIds: current.assignedGameIds.includes(gameId)
+        ? current.assignedGameIds.filter((id) => id !== gameId)
+        : [...current.assignedGameIds, gameId],
     }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setSubmitting(true);
+    setError('');
 
-    const payload = {
-      name: formData.name.trim() || formData.nameAr.trim(),
-      nameAr: formData.nameAr.trim() || formData.name.trim(),
-      age: Number(formData.age),
-      code: formData.code.trim().toUpperCase(),
-      avatar: formData.avatar,
-      goals: formData.goals
-        .split(/[،,]/)
-        .map((goal) => goal.trim())
-        .filter(Boolean),
-      assignedGames: formData.assignedGames.map((gameId) => Number(gameId)),
-    };
-
-    if (isEdit && student) {
-      updateStudent(student.id, payload);
-    } else {
-      addStudent({
-        ...payload,
-        currentLevels: {
-          listen_choose: 1,
-          action_drag_drop: 1,
-        },
-      });
+    if (!adminSession?.token) {
+      setError('جلسة الإدارة غير متاحة. سجلي الدخول مرة أخرى.');
+      setSubmitting(false);
+      return;
     }
 
-    navigate('/admin/students');
+    const payload = {
+      name: formData.name.trim(),
+      age: Number(formData.age),
+      diagnosis: formData.diagnosis.trim() || undefined,
+      currentLevel: Number(formData.currentLevel),
+      therapistId: formData.therapistId || undefined,
+      assignedGameIds: formData.assignedGameIds,
+    };
+
+    try {
+      if (isEdit && student) {
+        await updateStudent(student.id, payload);
+      } else {
+        await addStudent(payload);
+      }
+
+      await fetchStudents(adminSession.token);
+      navigate('/admin/patients');
+    } catch (submitError) {
+      setError(submitError?.response?.data?.message || submitError?.message || 'تعذر حفظ بيانات المستفيد.');
+      setSubmitting(false);
+    }
   };
 
   if (isEdit && !student) {
     return (
       <div className="bg-white rounded-[2rem] border border-slate-200 p-10 text-center">
-        <h2 className="text-3xl font-black text-slate-900 mb-3">الطالب غير موجود</h2>
-        <Button variant="primary" onClick={() => navigate('/admin/students')}>
-          العودة للطلاب
+        <h2 className="text-3xl font-black text-slate-900 mb-3">المستفيد غير موجود</h2>
+        <Button variant="primary" onClick={() => navigate('/admin/patients')}>
+          العودة إلى المستفيدين
         </Button>
       </div>
     );
@@ -128,16 +197,18 @@ const StudentForm = ({ mode = 'create' }) => {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between gap-4 mb-8">
-        <Button variant="outline" onClick={() => navigate('/admin/students')} className="!py-2 !px-4">
+        <Button variant="outline" onClick={() => navigate('/admin/patients')} className="!py-2 !px-4">
           <ArrowRight size={18} />
           <span>إلغاء</span>
         </Button>
 
         <div className="text-right">
           <h1 className="text-4xl font-black text-slate-900">
-            {isEdit ? 'تعديل الطالب' : 'إضافة طالب جديد'}
+            {isEdit ? 'تعديل المستفيد' : 'إضافة مستفيد جديد'}
           </h1>
-          <p className="text-slate-600 mt-2">اختاري الألعاب من القائمة بدل كتابتها يدويًا.</p>
+          <p className="text-slate-600 mt-2">
+            كود الدخول يُنشأ تلقائيًا من النظام عند إنشاء المستفيد.
+          </p>
         </div>
       </div>
 
@@ -145,108 +216,165 @@ const StudentForm = ({ mode = 'create' }) => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block font-bold text-slate-700 mb-2">الاسم بالعربية</label>
-              <input
-                type="text"
-                name="nameAr"
-                value={formData.nameAr}
-                onChange={handleChange}
-                className="w-full px-4 py-3 rounded-2xl border border-slate-300 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-2">الاسم بالإنجليزية</label>
+              <label className="block font-bold text-slate-700 mb-2">اسم المستفيد</label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
                 className="w-full px-4 py-3 rounded-2xl border border-slate-300 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-2">العمر</label>
+              <input
+                type="number"
+                min="1"
+                max="25"
+                name="age"
+                value={formData.age}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-300 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                required
               />
             </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block font-bold text-slate-700 mb-2">العمر</label>
+              <label className="block font-bold text-slate-700 mb-2">التشخيص</label>
               <input
-                type="number"
-                min="2"
-                max="18"
-                name="age"
-                value={formData.age}
+                type="text"
+                name="diagnosis"
+                value={formData.diagnosis}
                 onChange={handleChange}
                 className="w-full px-4 py-3 rounded-2xl border border-slate-300 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                placeholder="اختياري"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-2">كود الدخول</label>
+              <label className="block font-bold text-slate-700 mb-2">المستوى الحالي</label>
               <input
-                type="text"
-                dir="ltr"
-                name="code"
-                value={formData.code}
+                type="number"
+                min="1"
+                name="currentLevel"
+                value={formData.currentLevel}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-2xl border border-slate-300 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 uppercase"
+                className="w-full px-4 py-3 rounded-2xl border border-slate-300 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block font-bold text-slate-700 mb-3">صورة الطفل الرمزية</label>
-            <div className="flex flex-wrap gap-3">
-              {avatarOptions.map((avatar) => (
-                <button
-                  key={avatar}
-                  type="button"
-                  onClick={() => setFormData((current) => ({ ...current, avatar }))}
-                  className={`w-16 h-16 rounded-2xl text-3xl border transition-colors ${
-                    formData.avatar === avatar
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  {avatar}
-                </button>
-              ))}
+          {adminSession?.user?.role === 'SUPER_ADMIN' && (
+            <div>
+              <label className="block font-bold text-slate-700 mb-2">الدكتور المسؤول</label>
+              <select
+                name="therapistId"
+                value={formData.therapistId}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-300 bg-white outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                required
+              >
+                <option value="">اختار الدكتور</option>
+                {therapists.map((therapist) => (
+                  <option key={therapist.id} value={therapist.id}>
+                    {therapist.name} - {therapist.email}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
-
-          <div>
-            <label className="block font-bold text-slate-700 mb-2">الأهداف العلاجية</label>
-            <textarea
-              name="goals"
-              value={formData.goals}
-              onChange={handleChange}
-              rows="3"
-              placeholder="مثال: تنمية اللغة الاستقبالية، اتباع الأوامر البسيطة"
-              className="w-full px-4 py-3 rounded-2xl border border-slate-300 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-            />
-          </div>
+          )}
 
           <div>
             <label className="block font-bold text-slate-700 mb-2">الألعاب المخصصة</label>
-            <select
-              multiple
-              value={formData.assignedGames}
-              onChange={handleAssignedGamesChange}
-              className="w-full min-h-40 px-4 py-3 rounded-2xl border border-slate-300 bg-white outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-            >
-              {availableGames.map((game) => (
-                <option key={game.id} value={String(game.id)}>
-                  {game.titleAr} - المستوى {game.level}
-                </option>
-              ))}
-            </select>
-            <p className="mt-2 text-sm text-slate-500">اضغطي `Ctrl` أو `Cmd` لاختيار أكثر من لعبة.</p>
+            <div className="rounded-[1.75rem] border border-slate-300 bg-white p-4 space-y-4">
+              <input
+                type="text"
+                value={gamesFilter}
+                onChange={(event) => setGamesFilter(event.target.value)}
+                placeholder="ابحثي عن لعبة بالاسم أو المستوى"
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                disabled={loadingGames}
+              />
+
+              <div className="flex items-center justify-between text-sm gap-3">
+                <span className="text-slate-500">
+                  {loadingGames ? 'جارٍ تحميل الألعاب...' : `${formData.assignedGameIds.length} لعبة مختارة`}
+                </span>
+                {!!gamesFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setGamesFilter('')}
+                    className="font-bold text-blue-600 hover:text-blue-700"
+                  >
+                    مسح الفلتر
+                  </button>
+                )}
+              </div>
+
+              <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
+                {!loadingGames && !availableGames.length && (
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-5 text-center text-slate-500">
+                    لا توجد ألعاب متاحة حاليًا.
+                  </div>
+                )}
+
+                {!loadingGames && !!availableGames.length && !filteredGames.length && (
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-5 text-center text-slate-500">
+                    لا توجد نتائج مطابقة للبحث.
+                  </div>
+                )}
+
+                {filteredGames.map((game) => {
+                  const gameId = String(game.id);
+                  const checked = formData.assignedGameIds.includes(gameId);
+
+                  return (
+                    <label
+                      key={game.id}
+                      className={`flex items-start gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition-all ${
+                        checked
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAssignedGame(gameId)}
+                        className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-800">
+                          {game.titleAr || game.title || game.name}
+                        </div>
+                        <div className="text-sm text-slate-500 mt-1">المستوى {game.level}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
+          {error && (
+            <div className="rounded-3xl bg-red-50 border border-red-100 px-5 py-4 text-red-600 font-bold">
+              {error}
+            </div>
+          )}
+
           <div className="pt-4 border-t border-slate-200 flex justify-end">
-            <Button type="submit" variant="primary" className="!py-3 !px-8 bg-blue-600 hover:bg-blue-700">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={submitting}
+              className="!py-3 !px-8 bg-blue-600 hover:bg-blue-700"
+            >
               {isEdit ? <Save size={18} /> : <UserRoundPlus size={18} />}
-              <span>{isEdit ? 'حفظ التعديلات' : 'إضافة الطالب'}</span>
+              <span>{isEdit ? 'حفظ التعديلات' : 'إضافة المستفيد'}</span>
             </Button>
           </div>
         </form>

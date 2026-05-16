@@ -71,16 +71,16 @@
       "level": 1,
       "instructionText": "اجعل الطفل يشم الوردة",
       "instructionAudio": "",
-      "targetImage": "https://placehold.co/400x400/e2e8f0/475569?text=Child",
+      "targetImage": "http://localhost:5000/uploads/1777543413009.jpg",
       "items": [
         {
           "id": 1,
-          "image": "https://placehold.co/200x200/fecdd3/e11d48?text=Flower",
+          "image": "http://localhost:5000/uploads/1777542987237.jpg",
           "isCorrect": true
         },
         {
           "id": 2,
-          "image": "https://placehold.co/200x200/bfdbfe/2563eb?text=Ball",
+          "image": "http://localhost:5000/uploads/1777543301719.jpg",
           "isCorrect": false
         }
       ],

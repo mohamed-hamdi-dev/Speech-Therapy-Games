@@ -3,6 +3,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
 const env = require('../config/env');
+const { buildConfigFromLegacyGame } = require('../utils/gameConfig');
 
 async function ensureUploadsDirectory() {
   if (!fs.existsSync(env.uploadsDir)) {
@@ -32,7 +33,7 @@ async function ensureSuperAdmin() {
 }
 
 function mapLegacyGame(legacyGame) {
-  return {
+  const mappedGame = {
     name: legacyGame.name || legacyGame.title || 'Untitled Game',
     title: legacyGame.title || legacyGame.name || null,
     titleAr: legacyGame.titleAr || legacyGame.nameAr || null,
@@ -51,9 +52,18 @@ function mapLegacyGame(legacyGame) {
     successSound: legacyGame.successSound || null,
     failSound: legacyGame.failSound || null,
   };
+
+  return {
+    ...mappedGame,
+    config: buildConfigFromLegacyGame(mappedGame),
+  };
 }
 
 async function seedLegacyGames() {
+  if (!env.enableLegacyGameSeed) {
+    return;
+  }
+
   const count = await prisma.game.count();
 
   if (count > 0 || !fs.existsSync(env.legacyDbPath)) {

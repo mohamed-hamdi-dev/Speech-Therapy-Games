@@ -11,7 +11,7 @@ const { validateRequest } = require('../middleware/validate.middleware');
 
 const router = express.Router();
 
-router.use(authenticate, authorize('SUPER_ADMIN'));
+router.use('/api/therapists', authenticate, authorize('SUPER_ADMIN'));
 
 router.post(
   '/api/therapists',
@@ -20,6 +20,7 @@ router.post(
     body('email').isEmail().withMessage('A valid email is required.'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long.'),
     body('isActive').optional().isBoolean().withMessage('isActive must be boolean.'),
+    body('role').optional().isIn(['THERAPIST', 'SUPER_ADMIN']).withMessage('role is invalid.'),
     validateRequest,
   ],
   createTherapist
@@ -35,6 +36,7 @@ router.put(
     body('email').optional().isEmail().withMessage('A valid email is required.'),
     body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters long.'),
     body('isActive').optional().isBoolean().withMessage('isActive must be boolean.'),
+    body('role').optional().isIn(['THERAPIST', 'SUPER_ADMIN']).withMessage('role is invalid.'),
     validateRequest,
   ],
   updateTherapist

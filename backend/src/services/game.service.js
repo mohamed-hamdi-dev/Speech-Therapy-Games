@@ -1,10 +1,13 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/apiError');
+const { buildConfigFromPayload, normalizeGameRecord } = require('../utils/gameConfig');
 
 async function listGames() {
-  return prisma.game.findMany({
+  const games = await prisma.game.findMany({
     orderBy: [{ level: 'asc' }, { createdAt: 'asc' }],
   });
+
+  return games.map(normalizeGameRecord);
 }
 
 async function getGameById(gameId) {
@@ -16,17 +19,20 @@ async function getGameById(gameId) {
     throw new ApiError(404, 'Game not found.');
   }
 
-  return game;
+  return normalizeGameRecord(game);
 }
 
 async function createGame(payload) {
-  return prisma.game.create({
+  const config = buildConfigFromPayload(payload);
+  const createdGame = await prisma.game.create({
     data: {
-      name: payload.name || payload.title,
-      title: payload.title || payload.name || null,
-      titleAr: payload.titleAr || null,
-      type: payload.type,
-      level: payload.level,
+      gameCode: payload.gameCode,
+      name: payload.name || payload.title || config?.name || config?.nameAr,
+      title: payload.title || payload.name || config?.name || null,
+      titleAr: payload.titleAr || payload.nameAr || config?.nameAr || null,
+      type: payload.type || config?.templateType,
+      level: 1,
+      config,
       isActive: payload.isActive ?? true,
       questionText: payload.questionText || null,
       questionTextAr: payload.questionTextAr || null,
@@ -41,33 +47,50 @@ async function createGame(payload) {
       failSound: payload.failSound || null,
     },
   });
+
+  return normalizeGameRecord(createdGame);
 }
 
 async function updateGame(gameId, payload) {
-  await getGameById(gameId);
+  const existingGame = await prisma.game.findUnique({
+    where: { id: gameId },
+  });
 
-  return prisma.game.update({
+  if (!existingGame) {
+    throw new ApiError(404, 'Game not found.');
+  }
+
+  const config = buildConfigFromPayload({
+    ...existingGame,
+    ...payload,
+  });
+
+  const updatedGame = await prisma.game.update({
     where: { id: gameId },
     data: {
-      name: payload.name || payload.title,
-      title: payload.title || payload.name || null,
-      titleAr: payload.titleAr || null,
-      type: payload.type,
-      level: payload.level,
+      gameCode: payload.gameCode ?? existingGame.gameCode,
+      name: payload.name || payload.title || payload.nameAr || config?.name || existingGame.name,
+      title: payload.title || payload.name || config?.name || existingGame.title || null,
+      titleAr: payload.titleAr || payload.nameAr || config?.nameAr || existingGame.titleAr || null,
+      type: payload.type || config?.templateType || existingGame.type,
+      level: 1,
+      config,
       isActive: payload.isActive ?? true,
-      questionText: payload.questionText || null,
-      questionTextAr: payload.questionTextAr || null,
-      questionAudio: payload.questionAudio || null,
-      instructionText: payload.instructionText || null,
-      instructionTextAr: payload.instructionTextAr || null,
-      instructionAudio: payload.instructionAudio || null,
-      targetImage: payload.targetImage || null,
-      options: payload.options || null,
-      items: payload.items || null,
-      successSound: payload.successSound || null,
-      failSound: payload.failSound || null,
+      questionText: payload.questionText ?? existingGame.questionText ?? null,
+      questionTextAr: payload.questionTextAr ?? existingGame.questionTextAr ?? null,
+      questionAudio: payload.questionAudio ?? existingGame.questionAudio ?? null,
+      instructionText: payload.instructionText ?? existingGame.instructionText ?? null,
+      instructionTextAr: payload.instructionTextAr ?? existingGame.instructionTextAr ?? null,
+      instructionAudio: payload.instructionAudio ?? existingGame.instructionAudio ?? null,
+      targetImage: payload.targetImage ?? existingGame.targetImage ?? null,
+      options: payload.options ?? existingGame.options ?? null,
+      items: payload.items ?? existingGame.items ?? null,
+      successSound: payload.successSound ?? existingGame.successSound ?? null,
+      failSound: payload.failSound ?? existingGame.failSound ?? null,
     },
   });
+
+  return normalizeGameRecord(updatedGame);
 }
 
 async function deleteGame(gameId) {

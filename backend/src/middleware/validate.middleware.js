@@ -11,7 +11,7 @@ function validateRequest(req, _res, next) {
   return next(
     new ApiError(
       422,
-      'Validation failed.',
+      result.array()[0]?.msg || 'Validation failed.',
       result.array().map((issue) => ({
         field: issue.path,
         message: issue.msg,

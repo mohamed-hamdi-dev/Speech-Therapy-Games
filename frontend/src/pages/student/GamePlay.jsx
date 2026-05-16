@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
 import { DoorOpen, ShieldCheck } from 'lucide-react';
 import Button from '../../components/Button';
-import DragDropGame from '../../games/DragDropGame';
-import ListenChooseGame from '../../games/ListenChooseGame';
+import GameEngine from '../../games/GameEngine';
+import normalizeGameForEngine from '../../games/adapters/normalizeGameForEngine';
 import { PROMPT_LEVELS, useTherapyStore } from '../../hooks/useTherapyStore';
+import gameService from '../../services/gameService';
 
 const GamePlay = () => {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ const GamePlay = () => {
   const {
     currentStudent,
     endTherapistSession,
+    mapFrontendPromptToApi,
     saveSession,
     setTherapistControlsEnabled,
     setTherapistPromptLevel,
@@ -21,82 +22,112 @@ const GamePlay = () => {
 
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showIntroVideo, setShowIntroVideo] = useState(false);
+  const currentLevel = Math.min(Math.max(Number(currentStudent?.currentLevel || 1), 1), 3);
+  const assignedGame = useMemo(
+    () =>
+      Array.isArray(currentStudent?.assignedGames)
+        ? currentStudent.assignedGames.find((item) => String(item?.id) === String(gameId)) || null
+        : null,
+    [currentStudent?.assignedGames, gameId]
+  );
 
   useEffect(() => {
     const fetchGame = async () => {
+      if (assignedGame?.config) {
+        setGame(normalizeGameForEngine(assignedGame));
+        setError('');
+        setLoading(false);
+        return;
+      }
+
       try {
-        const response = await axios.get(`http://localhost:5000/api/games/${gameId}`);
-        setGame(response.data);
-      } catch (error) {
-        console.error('Error fetching game:', error);
+        setLoading(true);
+        setError('');
+        const response = await gameService.getGame(null, gameId);
+        setGame(normalizeGameForEngine(response));
+      } catch (_fetchError) {
+        if (assignedGame) {
+          setGame(normalizeGameForEngine(assignedGame));
+          setError('');
+          return;
+        }
+
+        setError('تعذر تحميل اللعبة.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchGame();
-  }, [gameId]);
+  }, [assignedGame, gameId]);
 
-  const handleGameComplete = (stats) => {
-    const totalQuestions = stats.correctAnswers + stats.wrongAnswers || 1;
-    const score = Math.round((stats.correctAnswers / totalQuestions) * 100);
-    const independentCount = stats.prompts.filter((prompt) => prompt === 'none').length;
-    const independenceRate = Math.round((independentCount / stats.prompts.length) * 100);
+  const introVideo = game?.config?.media?.introVideo || '';
 
-    const promptLabels = stats.prompts.map(
+  useEffect(() => {
+    setShowIntroVideo(Boolean(introVideo));
+  }, [introVideo, game?.id]);
+
+  const handleGameComplete = async (stats) => {
+    if (!currentStudent || !game) {
+      return;
+    }
+
+    const totalQuestions = (stats.correctAnswers || 0) + (stats.wrongAnswers || 0) || 1;
+    const score = Math.round(((stats.correctAnswers || 0) / totalQuestions) * 100);
+    const promptHistory = Array.isArray(stats.prompts) ? stats.prompts : [];
+    const independentCount = promptHistory.filter((prompt) => prompt === 'none').length;
+    const independenceRate = promptHistory.length
+      ? Math.round((independentCount / promptHistory.length) * 100)
+      : 100;
+
+    const promptSummary = promptHistory.map(
       (prompt) => PROMPT_LEVELS.find((level) => level.id === prompt)?.label || prompt
     );
 
-    const sessionData = {
-      studentId: currentStudent?.id,
+    const sessionPayload = {
+      studentId: currentStudent.id,
       gameId: game.id,
-      gameType: game.type,
-      level: game.level,
-      totalQuestions,
       score,
-      independenceRate,
-      therapistMode: therapistSession?.isActive,
-      promptSummary: promptLabels,
-      ...stats,
+      attempts: Array.isArray(stats.attempts)
+        ? stats.attempts.reduce((sum, value) => sum + value, 0)
+        : stats.attempts || totalQuestions,
+      duration: stats.timeSpent || 0,
+      sessionType: therapistSession?.isActive ? 'CLINIC' : 'HOME',
+      promptLevel: mapFrontendPromptToApi(therapistSession?.promptLevel || 'none'),
     };
 
-    saveSession(sessionData);
-    navigate('/student/result', { state: { game, sessionData } });
-  };
+    try {
+      const savedSession = await saveSession(sessionPayload);
+      const sessionData = {
+        ...savedSession,
+        gameType: game.type,
+        level: game.level,
+        totalQuestions,
+        correctAnswers: stats.correctAnswers || 0,
+        wrongAnswers: stats.wrongAnswers || 0,
+        score,
+        independenceRate,
+        therapistMode: therapistSession?.isActive,
+        promptSummary,
+        timeSpent: stats.timeSpent || 0,
+      };
 
-  const renderGame = () => {
-    const gameProps = {
-      game,
-      onComplete: handleGameComplete,
-      therapistControlsEnabled: therapistSession?.therapistControlsEnabled,
-      therapistPromptLevel: therapistSession?.promptLevel || 'none',
-    };
-
-    switch (game.type) {
-      case 'listen_choose':
-        return <ListenChooseGame {...gameProps} />;
-      case 'action_drag_drop':
-        return <DragDropGame {...gameProps} />;
-      default:
-        return (
-          <div className="bg-white rounded-[2.5rem] border border-[#eadfbe] p-10 text-center">
-            <h2 className="text-3xl font-black text-slate-800 mb-4">هذه اللعبة قيد التطوير</h2>
-            <Button variant="primary" onClick={() => navigate('/student/home')}>
-              العودة للألعاب
-            </Button>
-          </div>
-        );
+      navigate('/student/result', { state: { game, sessionData } });
+    } catch (saveError) {
+      setError(saveError?.response?.data?.message || saveError?.message || 'تعذر حفظ نتيجة الجلسة.');
     }
   };
 
   if (loading) {
-    return <div className="text-center py-24 text-3xl font-black text-slate-700">جاري تجهيز الجلسة...</div>;
+    return <div className="text-center py-24 text-3xl font-black text-slate-700">جارٍ تجهيز الجلسة...</div>;
   }
 
   if (!game) {
     return (
       <div className="bg-white rounded-[2.5rem] border border-[#eadfbe] p-10 text-center">
-        <h2 className="text-3xl font-black text-slate-800 mb-4">تعذر العثور على اللعبة</h2>
+        <h2 className="text-3xl font-black text-slate-800 mb-4">{error || 'تعذر العثور على اللعبة'}</h2>
         <Button variant="primary" onClick={() => navigate('/student/home')}>
           العودة
         </Button>
@@ -105,26 +136,24 @@ const GamePlay = () => {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" dir="rtl">
       {therapistSession?.isActive && (
         <section className="bg-white border border-[#c8ebd2] rounded-[2.5rem] p-5 md:p-6 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-[#14532d] text-white px-4 py-2 text-sm font-bold mb-3">
                 <ShieldCheck size={16} />
-                <span>Therapist Controls</span>
+                <span>وضع الدكتور</span>
               </div>
-              <h2 className="text-2xl font-black text-slate-900">وضع الدكتور</h2>
+              <h2 className="text-2xl font-black text-slate-900">متابعة الجلسة</h2>
               <p className="text-slate-600 mt-1">
-                فعّل التتبع أثناء اللعب وسجل مستوى المساعدة الحالي للطفل.
+                فعّل التتبع أثناء اللعب وسجّل مستوى المساعدة الحالي للطفل.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() =>
-                  setTherapistControlsEnabled(!therapistSession?.therapistControlsEnabled)
-                }
+                onClick={() => setTherapistControlsEnabled(!therapistSession?.therapistControlsEnabled)}
                 className={`rounded-[1.4rem] px-5 py-3 font-black transition-colors ${
                   therapistSession?.therapistControlsEnabled
                     ? 'bg-[#14532d] text-white'
@@ -167,14 +196,65 @@ const GamePlay = () => {
         </section>
       )}
 
+      {error && (
+        <div className="rounded-3xl bg-red-50 border border-red-100 px-5 py-4 text-red-600 font-bold">
+          {error}
+        </div>
+      )}
+
       <section className="bg-white/85 rounded-[2.8rem] border border-[#f0dda7] px-5 py-4 md:px-6 md:py-5 shadow-sm">
         <div className="text-center">
           <div className="text-sm font-bold text-slate-500 mb-1">اللعبة الحالية</div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900">{game.titleAr}</h1>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900">
+            {game.config?.nameAr || game.titleAr || game.title || game.name}
+          </h1>
         </div>
       </section>
 
-      {renderGame()}
+      {introVideo && showIntroVideo ? (
+        <section className="bg-white rounded-[2.5rem] border border-[#dbe7f3] p-5 md:p-6 shadow-sm space-y-4">
+          <div className="text-center">
+            <div className="text-sm font-bold text-slate-500 mb-2">شرح اللعبة</div>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900">شاهد الطريقة أولًا ثم ابدأ</h2>
+          </div>
+
+          <video
+            controls
+            autoPlay
+            playsInline
+            src={introVideo}
+            className="w-full rounded-[2rem] border border-slate-200 bg-slate-950 max-h-[28rem]"
+          />
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button variant="primary" onClick={() => setShowIntroVideo(false)}>
+              ابدأ اللعب
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/student/home')}>
+              العودة
+            </Button>
+          </div>
+        </section>
+      ) : (
+        <>
+          {introVideo && (
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={() => setShowIntroVideo(true)}>
+                مشاهدة الشرح مرة أخرى
+              </Button>
+            </div>
+          )}
+
+          <GameEngine
+            game={game}
+            onComplete={handleGameComplete}
+            therapistControlsEnabled={therapistSession?.therapistControlsEnabled}
+            therapistPromptLevel={therapistSession?.promptLevel || 'none'}
+            onUnsupported={() => navigate('/student/home')}
+            startLevel={currentLevel}
+          />
+        </>
+      )}
     </div>
   );
 };

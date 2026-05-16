@@ -12,6 +12,15 @@ const { validateRequest } = require('../middleware/validate.middleware');
 
 const router = express.Router();
 
+const supportedTypes = [
+  'matching.similar',
+  'matching.different',
+  'matching.find',
+  'sequence.order',
+  'action.drag_to_target',
+  'navigation.move_to_target',
+];
+
 router.get('/api/games', getGames);
 router.get('/api/games/:id', [param('id').notEmpty().withMessage('Game id is required.'), validateRequest], getGame);
 
@@ -20,11 +29,13 @@ router.post(
   [
     authenticate,
     authorize('SUPER_ADMIN', 'THERAPIST'),
+    body('gameCode').trim().notEmpty().withMessage('Game code is required.'),
     body('name').optional().trim().notEmpty().withMessage('Name cannot be empty.'),
+    body('nameAr').optional().trim().notEmpty().withMessage('Arabic name cannot be empty.'),
     body('title').optional().trim().notEmpty().withMessage('Title cannot be empty.'),
-    body('type').trim().notEmpty().withMessage('Game type is required.'),
-    body('level').isInt({ min: 1 }).withMessage('Level must be at least 1.'),
+    body('type').isIn(supportedTypes).withMessage('Unsupported game type.'),
     body('isActive').optional().isBoolean().withMessage('isActive must be boolean.'),
+    body('config').optional().isObject().withMessage('config must be an object.'),
     validateRequest,
   ],
   createGame
@@ -36,11 +47,13 @@ router.put(
     authenticate,
     authorize('SUPER_ADMIN', 'THERAPIST'),
     param('id').notEmpty().withMessage('Game id is required.'),
+    body('gameCode').trim().notEmpty().withMessage('Game code is required.'),
     body('name').optional().trim().notEmpty().withMessage('Name cannot be empty.'),
+    body('nameAr').optional().trim().notEmpty().withMessage('Arabic name cannot be empty.'),
     body('title').optional().trim().notEmpty().withMessage('Title cannot be empty.'),
-    body('type').trim().notEmpty().withMessage('Game type is required.'),
-    body('level').isInt({ min: 1 }).withMessage('Level must be at least 1.'),
+    body('type').isIn(supportedTypes).withMessage('Unsupported game type.'),
     body('isActive').optional().isBoolean().withMessage('isActive must be boolean.'),
+    body('config').optional().isObject().withMessage('config must be an object.'),
     validateRequest,
   ],
   updateGame

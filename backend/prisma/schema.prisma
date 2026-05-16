@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  engineType = "binary"
 }
 
 datasource db {
@@ -53,11 +54,13 @@ model Student {
 
 model Game {
   id              String        @id @default(cuid())
+  gameCode        String?       @unique
   name            String
   title           String?
   titleAr         String?
   type            String
   level           Int
+  config          Json?
   isActive        Boolean       @default(true)
   questionText    String?
   questionTextAr  String?
@@ -74,6 +77,18 @@ model Game {
   updatedAt       DateTime      @updatedAt
   students        StudentGame[]
   sessions        Session[]
+}
+
+model ImageLibrary {
+  id              String    @id @default(cuid())
+  url             String    @unique
+  thumbnail       String
+  category        String?
+  source          String?
+  createdAt       DateTime  @default(now())
+
+  @@index([category])
+  @@index([createdAt])
 }
 
 model StudentGame {

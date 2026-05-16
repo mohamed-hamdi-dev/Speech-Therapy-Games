@@ -4,6 +4,13 @@ import Card from '../components/Card';
 import FeedbackModal from '../components/FeedbackModal';
 import { playAudioUrl } from '../utils/soundEffects';
 
+const preventKeyboardAudioTrigger = (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+};
+
 const ListenChooseGame = ({
   game,
   onComplete,
@@ -51,6 +58,7 @@ const ListenChooseGame = ({
     <div className="flex flex-col items-center">
       <Card className="w-full mb-5 p-5 md:p-6 text-center bg-[#f7fbff] border-[#dbe7f3] rounded-[2rem]">
         <button
+          type="button"
           onClick={() => {
             if (game.questionAudio) {
               playAudioUrl(game.questionAudio);
@@ -60,6 +68,8 @@ const ListenChooseGame = ({
               window.speechSynthesis.speak(utterance);
             }
           }}
+          onKeyDown={preventKeyboardAudioTrigger}
+          onKeyUp={preventKeyboardAudioTrigger}
           className="w-16 h-16 md:w-20 md:h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 hover:scale-105 transition-transform shadow-lg shadow-blue-200"
         >
           <Volume2 size={32} className="text-white" />

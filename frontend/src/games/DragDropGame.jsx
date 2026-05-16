@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   MouseSensor,
   TouchSensor,
+  closestCenter,
   useDraggable,
   useDroppable,
   useSensor,
@@ -10,21 +11,27 @@ import {
 } from '@dnd-kit/core';
 import confetti from 'canvas-confetti';
 import { Volume2 } from 'lucide-react';
-import Button from '../components/Button';
 import { playAudioUrl, playErrorSound, playSuccessSound } from '../utils/soundEffects';
 
-function DraggableItem({ id, image, isCorrect, isDisabled }) {
+const preventKeyboardAudioTrigger = (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+};
+
+function DraggableCard({ item, disabled, matched }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id,
-    data: { isCorrect },
-    disabled: isDisabled,
+    id: item.id,
+    data: { draggableId: item.id, isCorrect: Boolean(item.isCorrect) },
+    disabled,
   });
 
   const style = transform
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: isDragging ? 50 : 1,
-        opacity: isDragging ? 0.82 : 1,
+        zIndex: isDragging ? 40 : 1,
+        opacity: isDragging ? 0.85 : 1,
       }
     : undefined;
 
@@ -34,167 +41,271 @@ function DraggableItem({ id, image, isCorrect, isDisabled }) {
       style={style}
       {...listeners}
       {...attributes}
-      className={`relative cursor-grab active:cursor-grabbing w-28 h-28 md:w-32 md:h-32 rounded-[1.6rem] overflow-hidden shadow-md border-4 border-white transition-all duration-300 hover:scale-105 ${
-        isDisabled ? 'opacity-50 cursor-not-allowed' : ''
-      }`}
+      className={`w-24 md:w-28 shrink-0 rounded-[1.4rem] border-2 bg-white p-2 shadow-sm transition-all ${
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing hover:-translate-y-1'
+      } ${matched ? 'border-emerald-400 bg-emerald-50' : 'border-[#dbe7f3]'}`}
     >
-      <img src={image} alt={`Item ${id}`} className="w-full h-full object-cover bg-white" />
+      {item.image ? (
+        <img
+          src={item.image}
+          alt={item.labelAr || item.id}
+          className="w-full h-20 md:h-24 object-contain rounded-xl bg-slate-50"
+        />
+      ) : (
+        <div className="w-full h-20 md:h-24 rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-xs font-black text-center px-2">
+          صورة العنصر
+        </div>
+      )}
+      {item.labelAr && <div className="text-center text-xs md:text-sm font-black text-slate-700 mt-2">{item.labelAr}</div>}
     </div>
   );
 }
 
-function DroppableTarget({ image, isHovered, children }) {
-  const { setNodeRef } = useDroppable({
-    id: 'target-zone',
-  });
+function DraggableTray({ title, items, feedback, matchedDraggableIds }) {
+  if (!items.length) return null;
+
+  return (
+    <section className="rounded-[1.8rem] border border-[#dbe7f3] bg-white/90 p-4 shadow-sm">
+      <div className="text-sm font-black text-slate-500 mb-3">{title}</div>
+      <div className="flex flex-wrap justify-center gap-3">
+        {items.map((item) => (
+          <DraggableCard
+            key={item.id}
+            item={item}
+            disabled={feedback === 'success' || matchedDraggableIds.includes(item.id)}
+            matched={matchedDraggableIds.includes(item.id)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SceneDropZone({ sceneImage, title, isOverScene, feedback }) {
+  const { setNodeRef } = useDroppable({ id: 'scene-drop-zone' });
 
   return (
     <div
       ref={setNodeRef}
-      className={`relative w-40 h-40 md:w-52 md:h-52 mx-auto rounded-full p-4 transition-all duration-500 ${
-        isHovered ? 'scale-110 shadow-[0_0_40px_rgba(37,99,235,0.24)] bg-[#eef4ff]' : 'bg-[#f7fbff]'
+      className={`relative rounded-[2.4rem] border p-4 min-h-[320px] shadow-sm transition-all ${
+        isOverScene ? 'border-blue-500 bg-blue-50' : 'border-[#dbe7f3] bg-[#f8fbff]'
       }`}
     >
-      <img
-        src={image}
-        alt="Target"
-        className="w-full h-full object-cover rounded-full border-4 border-white shadow-sm"
-      />
-      {children}
+      {sceneImage ? (
+        <img
+          src={sceneImage}
+          alt={title || 'scene'}
+          className="w-full h-[290px] md:h-[360px] object-contain rounded-[2rem] bg-white"
+        />
+      ) : (
+        <div className="w-full h-[290px] md:h-[360px] rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 font-black">
+          صورة المشهد
+        </div>
+      )}
+
+      <div className="absolute top-4 left-4 rounded-full bg-white/90 px-4 py-2 text-sm font-black text-slate-700 shadow-sm">
+        اسحب العنصر إلى المشهد
+      </div>
+
+      {feedback === 'success' && (
+        <div className="absolute inset-0 bg-emerald-500/10 rounded-[2rem] flex items-center justify-center pointer-events-none">
+          <div className="rounded-full bg-white/95 px-8 py-4 text-3xl font-black text-emerald-600 shadow-xl">
+            ممتاز!
+          </div>
+        </div>
+      )}
+
+      {feedback === 'error' && (
+        <div className="absolute inset-0 bg-red-500/10 rounded-[2rem] flex items-center justify-center pointer-events-none">
+          <div className="rounded-full bg-white/95 px-8 py-4 text-2xl font-black text-red-600 shadow-xl">
+            حاول مرة أخرى
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function DragDropGame({
+const groupedPositions = (items) => ({
+  left: items.filter((item) => item.startPosition === 'left'),
+  right: items.filter((item) => item.startPosition === 'right'),
+  bottom: items.filter((item) => item.startPosition === 'bottom' || !item.startPosition),
+});
+
+const DragDropGame = ({
   game,
+  config,
   onComplete,
   therapistControlsEnabled = false,
   therapistPromptLevel = 'none',
-}) {
+  previewMode = false,
+}) => {
+  const [matchedDraggableIds, setMatchedDraggableIds] = useState([]);
+  const [isOverScene, setIsOverScene] = useState(false);
   const [feedback, setFeedback] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [items, setItems] = useState([]);
-  const [startTime] = useState(Date.now());
   const [attempts, setAttempts] = useState(0);
+  const [startTime] = useState(Date.now());
 
-  const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: { distance: 10 },
-  });
+  const content = config?.content || {};
+  const feedbackConfig = config?.feedback || {};
+  const instructionAr = content?.instructionAr || 'اكتب التعليمات هنا';
+  const instructionAudio = content?.instructionAudio || '';
+  const sceneImage = content?.sceneImage || '';
+  const draggables = Array.isArray(content?.draggables) ? content.draggables : [];
+  const mode = content?.mode || 'one-to-one';
+  const positionGroups = useMemo(() => groupedPositions(draggables), [draggables]);
+  const totalNeededMatches = mode === 'multi-match' ? draggables.filter((item) => item.isCorrect).length : 1;
 
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 250, tolerance: 5 },
-  });
-
+  const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 8 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 5 } });
   const sensors = useSensors(mouseSensor, touchSensor);
 
   useEffect(() => {
-    if (game?.items) {
-      setItems([...game.items].sort(() => Math.random() - 0.5));
-    }
-  }, [game]);
+    setMatchedDraggableIds([]);
+    setIsOverScene(false);
+    setFeedback(null);
+    setAttempts(0);
+  }, [game?.id]);
+
+  useEffect(() => {
+    if (instructionAudio) playAudioUrl(instructionAudio);
+  }, [instructionAudio]);
 
   const playInstruction = () => {
-    if (game.instructionAudio) {
-      const audio = new Audio(game.instructionAudio);
-      audio.play().catch((error) => console.log('Audio error:', error));
+    if (instructionAudio) {
+      playAudioUrl(instructionAudio);
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(game.instructionText);
-    utterance.lang = 'ar-SA';
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const handleDragOver = ({ over }) => {
-    setIsHovered(Boolean(over && over.id === 'target-zone'));
-  };
-
-  const handleDragEnd = ({ active, over }) => {
-    setIsHovered(false);
-
-    if (!over || over.id !== 'target-zone') return;
-
-    const isCorrect = active.data.current?.isCorrect;
-    setAttempts((prev) => prev + 1);
-
-    if (!isCorrect) {
-      if (game.failSound) playAudioUrl(game.failSound);
-      else playErrorSound();
-      setFeedback('error');
-      return;
+    if (typeof window !== 'undefined') {
+      const utterance = new SpeechSynthesisUtterance(instructionAr);
+      utterance.lang = 'ar-SA';
+      window.speechSynthesis.speak(utterance);
     }
+  };
 
-    if (game.successSound) playAudioUrl(game.successSound);
+  const finishSuccess = (nextAttempts, nextMatchedIds) => {
+    if (feedbackConfig?.successSound) playAudioUrl(feedbackConfig.successSound);
     else playSuccessSound();
+
     setFeedback('success');
+
     confetti({
-      particleCount: 150,
-      spread: 80,
+      particleCount: 160,
+      spread: 90,
       origin: { y: 0.6 },
-      colors: ['#2563eb', '#60a5fa', '#f59e0b', '#ec4899'],
+      colors: ['#138fbc', '#10b981', '#f59e0b', '#ec4899'],
     });
 
     setTimeout(() => {
+      if (previewMode) {
+        setMatchedDraggableIds([]);
+        setFeedback(null);
+        return;
+      }
+
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+      const wrongAnswers = Math.max(nextAttempts - totalNeededMatches, 0);
+
       onComplete({
-        correctAnswers: 1,
-        wrongAnswers: attempts,
-        attempts: [attempts + 1],
+        correctAnswers: nextMatchedIds.length,
+        wrongAnswers,
+        attempts: [nextAttempts],
         prompts: [therapistControlsEnabled ? therapistPromptLevel : 'none'],
         timeSpent,
       });
-    }, 2200);
+    }, 1800);
   };
 
-  if (!game) return null;
+  const finishError = () => {
+    if (feedbackConfig?.failSound) playAudioUrl(feedbackConfig.failSound);
+    else playErrorSound();
+
+    setFeedback('error');
+    setTimeout(() => setFeedback(null), 900);
+  };
+
+  const handleDragOver = ({ over }) => {
+    setIsOverScene(Boolean(over && over.id === 'scene-drop-zone'));
+  };
+
+  const handleDragEnd = ({ active, over }) => {
+    setIsOverScene(false);
+
+    if (!over || over.id !== 'scene-drop-zone') {
+      return;
+    }
+
+    const draggableId = String(active.id);
+    const isCorrect = Boolean(active.data.current?.isCorrect);
+    const nextAttempts = attempts + 1;
+    setAttempts(nextAttempts);
+
+    if (!isCorrect || matchedDraggableIds.includes(draggableId)) {
+      finishError();
+      return;
+    }
+
+    const nextMatchedIds = [...matchedDraggableIds, draggableId];
+    setMatchedDraggableIds(nextMatchedIds);
+
+    const isCompleted = mode === 'multi-match' ? nextMatchedIds.length >= totalNeededMatches : true;
+
+    if (isCompleted) {
+      finishSuccess(nextAttempts, nextMatchedIds);
+    }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto py-2">
-      <div className="bg-white rounded-[2.4rem] p-5 md:p-6 shadow-sm border border-[#dbe7f3] mb-8 flex flex-col md:flex-row items-center justify-between gap-5">
+    <div className="max-w-6xl mx-auto space-y-6" dir="rtl">
+      <section className="bg-white rounded-[2rem] p-5 md:p-6 shadow-sm border border-[#dbe7f3] flex flex-col md:flex-row items-center justify-between gap-4">
         <h2 className="text-2xl md:text-3xl font-black text-slate-900 text-center md:text-right flex-grow leading-relaxed">
-          {game.instructionText}
+          {instructionAr}
         </h2>
-        <Button
-          variant="primary"
+        <button
+          type="button"
           onClick={playInstruction}
-          className="rounded-full w-16 h-16 md:w-18 md:h-18 flex items-center justify-center p-0 bg-blue-600 hover:bg-blue-700"
+          onKeyDown={preventKeyboardAudioTrigger}
+          onKeyUp={preventKeyboardAudioTrigger}
+          className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
         >
-          <Volume2 size={28} />
-        </Button>
-      </div>
+          <Volume2 size={24} className="text-white" />
+        </button>
+      </section>
 
-      <DndContext sensors={sensors} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div className="flex flex-col items-center gap-10">
-          <DroppableTarget image={game.targetImage} isHovered={isHovered}>
-            {feedback === 'success' && (
-              <div className="absolute inset-0 bg-blue-500/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <span className="text-5xl md:text-6xl font-black text-white drop-shadow-md">برافو!</span>
-              </div>
-            )}
-            {feedback === 'error' && (
-              <div className="absolute inset-0 bg-red-500/15 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <span className="text-3xl md:text-4xl font-black text-red-600 bg-white/95 px-6 py-3 rounded-full">
-                  حاول مرة أخرى
-                </span>
-              </div>
-            )}
-          </DroppableTarget>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+        <div className="space-y-5">
+          <SceneDropZone
+            sceneImage={sceneImage}
+            title={game?.titleAr}
+            isOverScene={isOverScene}
+            feedback={feedback}
+          />
 
-          <div className="bg-white/70 backdrop-blur-sm p-6 rounded-[2.4rem] w-full border border-[#dbe7f3]">
-            <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-              {items.map((item) => (
-                <DraggableItem
-                  key={item.id}
-                  id={item.id}
-                  image={item.image}
-                  isCorrect={item.isCorrect}
-                  isDisabled={feedback === 'success'}
-                />
-              ))}
-            </div>
+          <div className="grid grid-cols-1 gap-4">
+            <DraggableTray
+              title="عناصر من اليسار"
+              items={positionGroups.left}
+              feedback={feedback}
+              matchedDraggableIds={matchedDraggableIds}
+            />
+            <DraggableTray
+              title="عناصر من اليمين"
+              items={positionGroups.right}
+              feedback={feedback}
+              matchedDraggableIds={matchedDraggableIds}
+            />
+            <DraggableTray
+              title="عناصر من الأسفل"
+              items={positionGroups.bottom}
+              feedback={feedback}
+              matchedDraggableIds={matchedDraggableIds}
+            />
           </div>
         </div>
       </DndContext>
     </div>
   );
-}
+};
+
+export default DragDropGame;

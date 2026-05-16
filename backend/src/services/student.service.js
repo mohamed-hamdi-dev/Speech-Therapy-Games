@@ -1,4 +1,4 @@
-const prisma = require('../config/prisma');
+﻿const prisma = require('../config/prisma');
 const ApiError = require('../utils/apiError');
 const { generateUniqueAccessCode } = require('../utils/accessCode');
 
@@ -80,7 +80,9 @@ async function listStudents(currentUser) {
 
 async function createStudent(currentUser, payload) {
   const therapistId =
-    currentUser.role === 'SUPER_ADMIN' ? payload.therapistId : currentUser.userId;
+    currentUser.role === 'SUPER_ADMIN'
+      ? payload.therapistId || currentUser.userId
+      : currentUser.userId;
 
   await ensureTherapistExists(therapistId);
   await ensureGamesExist(payload.assignedGameIds || []);
@@ -226,10 +228,40 @@ async function findStudentForSession(currentUser, studentId) {
   return student;
 }
 
+async function regenerateAccessCode(currentUser, studentId) {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+  });
+
+  if (!student) {
+    throw new ApiError(404, 'Student not found.');
+  }
+
+  if (!canAccessStudent(currentUser, student)) {
+    throw new ApiError(403, 'You can only manage your own students.');
+  }
+
+  const accessCode = await generateUniqueAccessCode(student.name);
+
+  const updated = await prisma.student.update({
+    where: { id: studentId },
+    data: { accessCode },
+    select: {
+      id: true,
+      name: true,
+      accessCode: true,
+      updatedAt: true,
+    },
+  });
+
+  return updated;
+}
+
 module.exports = {
   listStudents,
   createStudent,
   updateStudent,
   deleteStudent,
   findStudentForSession,
+  regenerateAccessCode,
 };

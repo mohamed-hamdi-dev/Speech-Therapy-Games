@@ -1,4 +1,4 @@
-const asyncHandler = require('../utils/asyncHandler');
+﻿const asyncHandler = require('../utils/asyncHandler');
 const studentService = require('../services/student.service');
 
 const getStudents = asyncHandler(async (req, res) => {
@@ -36,9 +36,19 @@ const deleteStudent = asyncHandler(async (req, res) => {
   });
 });
 
+const regenerateAccessCode = asyncHandler(async (req, res) => {
+  const data = await studentService.regenerateAccessCode(req.user, req.params.id);
+  res.json({
+    success: true,
+    message: 'Access code regenerated successfully.',
+    data,
+  });
+});
+
 module.exports = {
   getStudents,
   createStudent,
   updateStudent,
   deleteStudent,
+  regenerateAccessCode,
 };

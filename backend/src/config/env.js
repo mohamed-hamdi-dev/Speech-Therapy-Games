@@ -17,5 +17,9 @@ module.exports = {
   superAdminEmail: process.env.SUPER_ADMIN_EMAIL || 'admin@speech.local',
   superAdminPassword: process.env.SUPER_ADMIN_PASSWORD || '12345678',
   uploadsDir: path.join(__dirname, '../../uploads'),
-  legacyDbPath: path.join(__dirname, '../../data/db.json'),
+  legacyDbPath: path.join(__dirname, '../../data/legacy-games.archive.json'),
+  enableLegacyGameSeed: process.env.ENABLE_LEGACY_GAME_SEED === 'true',
+  imageSearchProvider: process.env.IMAGE_SEARCH_PROVIDER || 'pexels',
+  pexelsApiKey: process.env.PEXELS_API_KEY || '',
+  pixabayApiKey: process.env.PIXABAY_API_KEY || '',
 };

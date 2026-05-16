@@ -1,5 +1,6 @@
 const ApiError = require('../utils/apiError');
 const { verifyToken } = require('../utils/jwt');
+const { normalizeRole } = require('../utils/roles');
 
 function authenticate(req, _res, next) {
   const authHeader = req.headers.authorization || '';
@@ -11,6 +12,7 @@ function authenticate(req, _res, next) {
 
   try {
     req.user = verifyToken(token);
+    req.user.role = normalizeRole(req.user.role);
     return next();
   } catch (error) {
     return next(new ApiError(401, 'Invalid or expired authentication token.'));
@@ -23,7 +25,9 @@ function authorize(...roles) {
       return next(new ApiError(401, 'Authentication is required.'));
     }
 
-    if (!roles.includes(req.user.role)) {
+    const allowedRoles = roles.map(normalizeRole);
+
+    if (!allowedRoles.includes(req.user.role)) {
       return next(new ApiError(403, 'You do not have permission to perform this action.'));
     }
 

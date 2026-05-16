@@ -1,129 +1,24 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
-
-const API_BASE = 'http://localhost:5000/api';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import authService from '../services/authService';
+import reportService from '../services/reportService';
+import sessionService from '../services/sessionService';
+import studentService from '../services/studentService';
 
 const STORAGE_KEYS = {
-  students: 'therapy_students',
-  sessions: 'therapy_sessions',
-  currentStudent: 'therapy_active_student',
-  activeMode: 'therapy_active_mode',
   adminSession: 'therapy_admin_session',
+  studentSession: 'therapy_student_session',
+  studentSessionTransient: 'therapy_student_session_transient',
   therapistSession: 'therapy_therapist_session',
 };
 
-const THERAPIST_ACCOUNT = {
-  email: 'therapist@speech.local',
-  password: '123456',
-  name: 'Therapist Admin',
+const defaultTherapistSession = {
+  isActive: false,
+  therapistControlsEnabled: false,
+  promptLevel: 'none',
+  launchedGameId: null,
+  studentId: null,
+  startedAt: null,
 };
-
-const SEED_STUDENTS = [
-  {
-    id: 1,
-    name: 'Ahmed Mohamed',
-    nameAr: 'أحمد محمد',
-    age: 5,
-    code: 'AHMED123',
-    avatar: '🌟',
-    goals: ['تنمية اللغة الاستقبالية', 'اتباع الأوامر البسيطة'],
-    assignedGames: ['listen_choose', 'action_drag_drop'],
-    currentLevels: {
-      listen_choose: 1,
-      action_drag_drop: 1,
-    },
-  },
-  {
-    id: 2,
-    name: 'Layla Hassan',
-    nameAr: 'ليلى حسن',
-    age: 4,
-    code: 'LAYLA456',
-    avatar: '🦋',
-    goals: ['التعرف على الألوان', 'زيادة الانتباه'],
-    assignedGames: ['listen_choose'],
-    currentLevels: {
-      listen_choose: 2,
-    },
-  },
-];
-
-const SEED_SESSIONS = [
-  {
-    id: 's1',
-    studentId: 1,
-    gameId: 1,
-    gameType: 'listen_choose',
-    level: 1,
-    totalQuestions: 10,
-    correctAnswers: 5,
-    wrongAnswers: 5,
-    independenceRate: 40,
-    score: 50,
-    timeSpent: 300,
-    therapistMode: true,
-    date: '2026-04-25T10:00:00Z',
-  },
-  {
-    id: 's2',
-    studentId: 1,
-    gameId: 1,
-    gameType: 'listen_choose',
-    level: 1,
-    totalQuestions: 10,
-    correctAnswers: 7,
-    wrongAnswers: 3,
-    independenceRate: 60,
-    score: 70,
-    timeSpent: 240,
-    therapistMode: true,
-    date: '2026-04-28T10:00:00Z',
-  },
-];
-
-const readStorage = (key, fallback) => {
-  const value = localStorage.getItem(key);
-  if (!value) return fallback;
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
-};
-
-const ensureArray = (value, fallback) => (Array.isArray(value) ? value : fallback);
-const ensureObjectOrNull = (value) =>
-  value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-
-const writeStorage = (key, value) => {
-  if (value === null || value === undefined) {
-    localStorage.removeItem(key);
-    return;
-  }
-
-  localStorage.setItem(key, JSON.stringify(value));
-};
-
-const getInitialStudents = () => ensureArray(readStorage(STORAGE_KEYS.students, SEED_STUDENTS), SEED_STUDENTS);
-const getInitialSessions = () => ensureArray(readStorage(STORAGE_KEYS.sessions, SEED_SESSIONS), SEED_SESSIONS);
-const getInitialCurrentStudent = () => ensureObjectOrNull(readStorage(STORAGE_KEYS.currentStudent, null));
-const getInitialActiveMode = () => readStorage(STORAGE_KEYS.activeMode, 'parent');
-const getInitialAdminSession = () => ensureObjectOrNull(readStorage(STORAGE_KEYS.adminSession, null));
-const getInitialTherapistSession = () =>
-  ensureObjectOrNull(
-    readStorage(STORAGE_KEYS.therapistSession, {
-      isActive: false,
-      therapistControlsEnabled: false,
-      promptLevel: 'none',
-      launchedGameId: null,
-    })
-  ) || {
-    isActive: false,
-    therapistControlsEnabled: false,
-    promptLevel: 'none',
-    launchedGameId: null,
-  };
 
 export const PROMPT_LEVELS = [
   { id: 'none', label: 'بدون مساعدة' },
@@ -135,254 +30,486 @@ export const PROMPT_LEVELS = [
   { id: 'full_physical', label: 'جسدي كامل' },
 ];
 
-export function useTherapyStore() {
-  const [students, setStudents] = useState(getInitialStudents);
-  const [sessions, setSessions] = useState(getInitialSessions);
-  const [currentStudent, setCurrentStudent] = useState(getInitialCurrentStudent);
-  const [activeMode, setActiveMode] = useState(getInitialActiveMode);
-  const [adminSession, setAdminSession] = useState(getInitialAdminSession);
-  const [therapistSession, setTherapistSession] = useState(getInitialTherapistSession);
+const TherapyContext = createContext(null);
+
+const readStorage = (key, fallback) => {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const writeStorage = (key, value) => {
+  if (!value) {
+    localStorage.removeItem(key);
+    return;
+  }
+
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+const normalizeRole = (role) => {
+  if (!role) {
+    return null;
+  }
+
+  const normalized = String(role).trim().toUpperCase();
+
+  if (normalized === 'ADMIN' || normalized === 'SUPERADMIN' || normalized === 'SUPER_ADMIN') {
+    return 'SUPER_ADMIN';
+  }
+
+  if (normalized === 'DOCTOR' || normalized === 'THERAPIST') {
+    return 'THERAPIST';
+  }
+
+  if (normalized === 'STUDENT') {
+    return 'STUDENT';
+  }
+
+  return normalized;
+};
+
+const normalizeAdminSession = (session) => {
+  if (!session || typeof session !== 'object') {
+    return null;
+  }
+
+  const role = normalizeRole(session.user?.role);
+
+  // Reject old sessions that don't have a recognized role (forces fresh login)
+  if (!session.token || !role) {
+    return null;
+  }
+
+  return {
+    ...session,
+    user: {
+      ...session.user,
+      role,
+    },
+  };
+};
+
+const normalizeStudentSession = (session) => {
+  if (!session || typeof session !== 'object') {
+    return null;
+  }
+
+  return session.token && session.student ? session : null;
+};
+
+const readStudentSession = () => {
+  const persistent = normalizeStudentSession(readStorage(STORAGE_KEYS.studentSession, null));
+  if (persistent) {
+    return persistent;
+  }
+
+  return normalizeStudentSession(readStorage(STORAGE_KEYS.studentSessionTransient, null));
+};
+
+const normalizeStudent = (student) => ({
+  ...student,
+  code: student.accessCode,
+  assignedGames: Array.isArray(student.assignedGames) ? student.assignedGames : [],
+});
+
+const mapFrontendPromptToApi = (promptLevel) => {
+  if (promptLevel === 'none') return 'INDEPENDENT';
+  if (promptLevel === 'full_physical') return 'FULL';
+  return 'PARTIAL';
+};
+
+const getErrorMessage = (error, fallback) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.error ||
+  error?.message ||
+  fallback;
+
+export function TherapyProvider({ children }) {
+  const [adminSession, setAdminSession] = useState(() =>
+    normalizeAdminSession(readStorage(STORAGE_KEYS.adminSession, null))
+  );
+  const [studentSession, setStudentSession] = useState(() => readStudentSession());
+  const [therapistSession, setTherapistSession] = useState(() =>
+    readStorage(STORAGE_KEYS.therapistSession, defaultTherapistSession)
+  );
+  const [students, setStudents] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [lastError, setLastError] = useState('');
+
+  const activeMode = therapistSession?.isActive ? 'therapist' : studentSession?.source || 'parent';
+  const currentStudent = studentSession?.student || null;
 
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEYS.students) || !Array.isArray(students)) {
-      writeStorage(STORAGE_KEYS.students, SEED_STUDENTS);
-      setStudents(SEED_STUDENTS);
+    writeStorage(STORAGE_KEYS.adminSession, adminSession);
+  }, [adminSession]);
+
+  useEffect(() => {
+    if (!studentSession) {
+      localStorage.removeItem(STORAGE_KEYS.studentSession);
+      sessionStorage.removeItem(STORAGE_KEYS.studentSessionTransient);
+      return;
     }
 
-    if (!localStorage.getItem(STORAGE_KEYS.sessions) || !Array.isArray(sessions)) {
-      writeStorage(STORAGE_KEYS.sessions, SEED_SESSIONS);
-      setSessions(SEED_SESSIONS);
-    }
-  }, [sessions, students]);
-
-  const syncStudent = (student, mode) => {
-    setCurrentStudent(student);
-    setActiveMode(mode);
-    writeStorage(STORAGE_KEYS.currentStudent, student);
-    writeStorage(STORAGE_KEYS.activeMode, mode);
-  };
-
-  const loginStudent = (code, source = 'parent') => {
-    const normalizedCode = code.trim().toUpperCase();
-    const student = students.find((item) => {
-      const candidateCode = item.code || item.accessCode || '';
-      return candidateCode.toUpperCase() === normalizedCode;
-    });
-    if (!student) return false;
-
-    syncStudent(student, source);
-
-    if (source !== 'therapist') {
-      const resetSession = {
-        isActive: false,
-        therapistControlsEnabled: false,
-        promptLevel: 'none',
-        launchedGameId: null,
-      };
-      setTherapistSession(resetSession);
-      writeStorage(STORAGE_KEYS.therapistSession, resetSession);
+    if (studentSession.rememberMe) {
+      localStorage.setItem(STORAGE_KEYS.studentSession, JSON.stringify(studentSession));
+      sessionStorage.removeItem(STORAGE_KEYS.studentSessionTransient);
+      return;
     }
 
-    return true;
-  };
+    sessionStorage.setItem(STORAGE_KEYS.studentSessionTransient, JSON.stringify(studentSession));
+    localStorage.removeItem(STORAGE_KEYS.studentSession);
+  }, [studentSession]);
 
-  const logoutStudent = () => {
-    setCurrentStudent(null);
-    setActiveMode('parent');
-    writeStorage(STORAGE_KEYS.currentStudent, null);
-    writeStorage(STORAGE_KEYS.activeMode, 'parent');
-  };
+  useEffect(() => {
+    writeStorage(STORAGE_KEYS.therapistSession, therapistSession);
+  }, [therapistSession]);
 
-  const loginAdmin = async (email, password) => {
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setAdminSession(null);
+      setStudentSession(null);
+      setStudents([]);
+      setSessions([]);
+      setTherapistSession(defaultTherapistSession);
+      setLastError('انتهت الجلسة. سجل الدخول مرة أخرى.');
+    };
+
+    window.addEventListener('therapy:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('therapy:unauthorized', handleUnauthorized);
+  }, []);
+
+  const fetchStudents = useCallback(async (token = adminSession?.token) => {
+    if (!token) {
+      setStudents([]);
+      return [];
+    }
+
+    setLoadingStudents(true);
     try {
-      const response = await axios.post(`${API_BASE}/admin/login`, { email, password });
+      const response = await studentService.getStudents(token);
+      const data = Array.isArray(response?.data) ? response.data.map(normalizeStudent) : [];
+      setStudents(data);
+      return data;
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, [adminSession?.token]);
+
+  const fetchSessions = useCallback(async (token = adminSession?.token) => {
+    if (!token) {
+      setSessions([]);
+      return [];
+    }
+
+    setLoadingSessions(true);
+    try {
+      const response = await sessionService.getSessions(token);
+      const data = Array.isArray(response?.data) ? response.data : [];
+      setSessions(data);
+      return data;
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, [adminSession?.token]);
+
+  useEffect(() => {
+    if (adminSession?.token) {
+      fetchStudents(adminSession.token).catch(() => {});
+      fetchSessions(adminSession.token).catch(() => {});
+    } else {
+      setStudents([]);
+      setSessions([]);
+    }
+  }, [adminSession?.token]);
+
+  const loginAdmin = useCallback(async (email, password) => {
+    try {
+      setLastError('');
+      const response = await authService.loginTherapist({ email, password });
       const session = {
-        email: response.data.user.email,
-        name: response.data.user.name,
-        token: response.data.token,
+        token: response.token,
+        user: {
+          ...response.user,
+          role: normalizeRole(response.user?.role),
+        },
+        name: response.user.name,
+        email: response.user.email,
         loggedInAt: new Date().toISOString(),
       };
 
       setAdminSession(session);
-      writeStorage(STORAGE_KEYS.adminSession, session);
-      return true;
+      return { success: true, session };
     } catch (error) {
-      const normalizedEmail = email.trim().toLowerCase();
-      if (
-        normalizedEmail !== THERAPIST_ACCOUNT.email.toLowerCase() ||
-        password !== THERAPIST_ACCOUNT.password
-      ) {
-        return false;
+      return {
+        success: false,
+        message: getErrorMessage(error, 'تعذر تسجيل الدخول.'),
+      };
+    }
+  }, []);
+
+  const logoutAdmin = useCallback(() => {
+    setAdminSession(null);
+    setStudents([]);
+    setSessions([]);
+    setTherapistSession(defaultTherapistSession);
+  }, []);
+
+  const loginStudent = useCallback(async (code, source = 'parent', rememberMe = false) => {
+    try {
+      setLastError('');
+      const response = await authService.loginPatient(code.trim().toUpperCase());
+      const studentPayload = response.student || response.patient;
+      const session = {
+        token: response.token,
+        student: normalizeStudent(studentPayload),
+        source,
+        rememberMe,
+        loggedInAt: new Date().toISOString(),
+      };
+
+      setStudentSession(session);
+
+      if (source !== 'therapist') {
+        setTherapistSession(defaultTherapistSession);
       }
 
-      const session = {
-        email: THERAPIST_ACCOUNT.email,
-        name: THERAPIST_ACCOUNT.name,
-        token: null,
-        loggedInAt: new Date().toISOString(),
+      return { success: true, session };
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, 'الكود غير صحيح.'),
       };
-
-      setAdminSession(session);
-      writeStorage(STORAGE_KEYS.adminSession, session);
-      return true;
     }
-  };
+  }, []);
 
-  const logoutAdmin = () => {
-    setAdminSession(null);
-    writeStorage(STORAGE_KEYS.adminSession, null);
-  };
+  const logoutStudent = useCallback(() => {
+    setStudentSession(null);
+    if (!therapistSession?.isActive) {
+      setTherapistSession(defaultTherapistSession);
+    }
+  }, [therapistSession?.isActive]);
 
-  const startTherapistSession = (student, launchedGameId = null) => {
-    syncStudent(student, 'therapist');
+  const startTherapistSession = useCallback((student, launchedGameId = null) => {
+    const normalizedStudent = normalizeStudent(student);
+    setStudentSession({
+      token: null,
+      student: normalizedStudent,
+      source: 'therapist',
+      loggedInAt: new Date().toISOString(),
+    });
 
     const nextSession = {
       isActive: true,
       therapistControlsEnabled: true,
       promptLevel: 'none',
-      studentId: student.id,
       launchedGameId,
+      studentId: normalizedStudent.id,
       startedAt: new Date().toISOString(),
     };
 
     setTherapistSession(nextSession);
-    writeStorage(STORAGE_KEYS.therapistSession, nextSession);
     return nextSession;
-  };
+  }, []);
 
-  const endTherapistSession = () => {
-    const resetSession = {
-      isActive: false,
-      therapistControlsEnabled: false,
-      promptLevel: 'none',
-      launchedGameId: null,
-    };
+  const endTherapistSession = useCallback(() => {
+    setTherapistSession(defaultTherapistSession);
+    if (studentSession?.source === 'therapist') {
+      setStudentSession(null);
+    }
+  }, [studentSession?.source]);
 
-    setTherapistSession(resetSession);
-    writeStorage(STORAGE_KEYS.therapistSession, resetSession);
-    setActiveMode('parent');
-    writeStorage(STORAGE_KEYS.activeMode, 'parent');
-  };
-
-  const setTherapistControlsEnabled = (enabled) => {
-    const updated = {
-      ...therapistSession,
+  const setTherapistControlsEnabled = useCallback((enabled) => {
+    setTherapistSession((current) => ({
+      ...current,
       therapistControlsEnabled: enabled,
-    };
-    setTherapistSession(updated);
-    writeStorage(STORAGE_KEYS.therapistSession, updated);
-  };
+    }));
+  }, []);
 
-  const setTherapistPromptLevel = (promptLevel) => {
-    const updated = {
-      ...therapistSession,
+  const setTherapistPromptLevel = useCallback((promptLevel) => {
+    setTherapistSession((current) => ({
+      ...current,
       promptLevel,
-    };
-    setTherapistSession(updated);
-    writeStorage(STORAGE_KEYS.therapistSession, updated);
-  };
+    }));
+  }, []);
 
-  const addStudent = (studentData) => {
-    const newStudent = {
-      ...studentData,
-      id: Date.now(),
-      currentLevels: studentData.currentLevels || {},
-      assignedGames: studentData.assignedGames || [],
-    };
+  const addStudent = useCallback(async (studentData) => {
+    if (!adminSession?.token) {
+      throw new Error('جلسة الإدارة غير متاحة.');
+    }
 
-    const updated = [...students, newStudent];
-    setStudents(updated);
-    writeStorage(STORAGE_KEYS.students, updated);
-    return newStudent;
-  };
+    const response = await studentService.createStudent(adminSession.token, studentData);
+    const student = normalizeStudent(response.data);
+    setStudents((current) => [student, ...current]);
+    return student;
+  }, [adminSession?.token]);
 
-  const deleteStudent = (studentId) => {
-    const updatedStudents = students.filter((student) => student.id !== studentId);
-    setStudents(updatedStudents);
-    writeStorage(STORAGE_KEYS.students, updatedStudents);
-  };
+  const updateStudent = useCallback(async (studentId, updates) => {
+    if (!adminSession?.token) {
+      throw new Error('جلسة الإدارة غير متاحة.');
+    }
 
-  const saveSession = (sessionData) => {
-    const newSession = {
-      ...sessionData,
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-    };
+    const response = await studentService.updateStudent(adminSession.token, studentId, updates);
+    const updatedStudent = normalizeStudent(response.data);
 
-    const updatedSessions = [...sessions, newSession];
-    setSessions(updatedSessions);
-    writeStorage(STORAGE_KEYS.sessions, updatedSessions);
-    return newSession;
-  };
-
-  const updateStudent = (studentId, updates) => {
-    const updatedStudents = students.map((student) =>
-      student.id === studentId ? { ...student, ...updates } : student
+    setStudents((current) =>
+      current.map((student) => (student.id === studentId ? updatedStudent : student))
     );
 
-    setStudents(updatedStudents);
-    writeStorage(STORAGE_KEYS.students, updatedStudents);
+    if (currentStudent?.id === studentId) {
+      setStudentSession((current) =>
+        current
+          ? {
+              ...current,
+              student: updatedStudent,
+            }
+          : current
+      );
+    }
+
+    return updatedStudent;
+  }, [adminSession?.token, currentStudent?.id]);
+
+  const deleteStudent = useCallback(async (studentId) => {
+    if (!adminSession?.token) {
+      throw new Error('جلسة الإدارة غير متاحة.');
+    }
+
+    await studentService.deleteStudent(adminSession.token, studentId);
+    setStudents((current) => current.filter((student) => student.id !== studentId));
+    setSessions((current) => current.filter((session) => session.studentId !== studentId));
 
     if (currentStudent?.id === studentId) {
-      const nextActiveStudent = updatedStudents.find((student) => student.id === studentId) || null;
-      setCurrentStudent(nextActiveStudent);
-      writeStorage(STORAGE_KEYS.currentStudent, nextActiveStudent);
+      setStudentSession(null);
+      setTherapistSession(defaultTherapistSession);
     }
-  };
+  }, [adminSession?.token, currentStudent?.id]);
 
-  const updateStudentLevel = (studentId, gameType, level) => {
-    const student = students.find((item) => item.id === studentId);
-    if (!student) return;
+  const regenerateStudentAccessCode = useCallback(async (studentId) => {
+    if (!adminSession?.token) {
+      throw new Error('جلسة الإدارة غير متاحة.');
+    }
 
-    updateStudent(studentId, {
-      currentLevels: {
-        ...student.currentLevels,
-        [gameType]: level,
-      },
-    });
-  };
+    const response = await studentService.regenerateAccessCode(adminSession.token, studentId);
+    const updated = response?.data;
 
-  const resetDemoData = () => {
-    const resetTherapistSession = {
-      isActive: false,
-      therapistControlsEnabled: false,
-      promptLevel: 'none',
-      launchedGameId: null,
-    };
+    if (updated?.id) {
+      setStudents((current) =>
+        current.map((student) =>
+          String(student.id) === String(updated.id)
+            ? { ...student, accessCode: updated.accessCode, code: updated.accessCode }
+            : student
+        )
+      );
+    }
 
-    setStudents(SEED_STUDENTS);
-    setSessions(SEED_SESSIONS);
-    setCurrentStudent(null);
-    setActiveMode('parent');
-    setTherapistSession(resetTherapistSession);
+    return updated;
+  }, [adminSession?.token]);
 
-    writeStorage(STORAGE_KEYS.students, SEED_STUDENTS);
-    writeStorage(STORAGE_KEYS.sessions, SEED_SESSIONS);
-    writeStorage(STORAGE_KEYS.currentStudent, null);
-    writeStorage(STORAGE_KEYS.activeMode, 'parent');
-    writeStorage(STORAGE_KEYS.therapistSession, resetTherapistSession);
-  };
 
-  return {
-    adminSession,
-    activeMode,
-    currentStudent,
-    sessions,
-    students,
-    therapistSession,
-    loginAdmin,
-    logoutAdmin,
-    loginStudent,
-    logoutStudent,
-    startTherapistSession,
-    endTherapistSession,
-    setTherapistControlsEnabled,
-    setTherapistPromptLevel,
-    addStudent,
-    updateStudent,
-    updateStudentLevel,
-    resetDemoData,
-    deleteStudent,
-    saveSession,
-  };
+  const saveSession = useCallback(async (sessionData) => {
+    const candidateTokens = therapistSession?.isActive
+      ? [adminSession?.token, studentSession?.token]
+      : [studentSession?.token, adminSession?.token];
+    const tokens = [...new Set(candidateTokens.filter(Boolean))];
+
+    if (tokens.length === 0) {
+      throw new Error('لا توجد صلاحية لحفظ الجلسة.');
+    }
+
+    let lastError = null;
+
+    for (let index = 0; index < tokens.length; index += 1) {
+      try {
+        const response = await sessionService.createSession(tokens[index], sessionData);
+        const session = response.data;
+        setSessions((current) => [session, ...current]);
+        return session;
+      } catch (error) {
+        lastError = error;
+        const status = error?.response?.status;
+        const canRetry = index < tokens.length - 1 && (status === 401 || status === 403);
+
+        if (!canRetry) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError || new Error('لا توجد صلاحية لحفظ الجلسة.');
+  }, [adminSession?.token, studentSession?.token, therapistSession?.isActive]);
+
+  const getStudentReport = useCallback(async (studentId) => {
+    const token = adminSession?.token || studentSession?.token;
+    if (!token) {
+      throw new Error('لا توجد صلاحية لجلب التقرير.');
+    }
+
+    const response = await reportService.getStudentReport(token, studentId);
+    return response.data;
+  }, [adminSession?.token, studentSession?.token]);
+
+  const value = useMemo(
+    () => ({
+      adminSession,
+      studentSession,
+      therapistSession,
+      activeMode,
+      currentStudent,
+      students,
+      sessions,
+      loadingStudents,
+      loadingSessions,
+      lastError,
+      setLastError,
+      loginAdmin,
+      logoutAdmin,
+      loginStudent,
+      logoutStudent,
+      fetchStudents,
+      fetchSessions,
+      addStudent,
+      updateStudent,
+      deleteStudent,
+      regenerateStudentAccessCode,
+      saveSession,
+      getStudentReport,
+      startTherapistSession,
+      endTherapistSession,
+      setTherapistControlsEnabled,
+      setTherapistPromptLevel,
+      updateStudentLevel: async () => {},
+      resetDemoData: async () => {},
+      mapFrontendPromptToApi,
+    }),
+    [
+      adminSession,
+      studentSession,
+      therapistSession,
+      activeMode,
+      currentStudent,
+      students,
+      sessions,
+      loadingStudents,
+      loadingSessions,
+      lastError,
+    ]
+  );
+
+  return React.createElement(TherapyContext.Provider, { value }, children);
+}
+
+export function useTherapyStore() {
+  const context = useContext(TherapyContext);
+
+  if (!context) {
+    throw new Error('useTherapyStore must be used inside TherapyProvider.');
+  }
+
+  return context;
 }

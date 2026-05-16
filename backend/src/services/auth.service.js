@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
+const env = require('../config/env');
 const ApiError = require('../utils/apiError');
 const { signToken } = require('../utils/jwt');
+const { normalizeRole } = require('../utils/roles');
 
 async function loginWithEmail({ email, password }) {
   const user = await prisma.user.findUnique({
@@ -17,10 +19,12 @@ async function loginWithEmail({ email, password }) {
     throw new ApiError(401, 'Invalid email or password.');
   }
 
+  const role = normalizeRole(user.role);
+
   const token = signToken({
     sub: user.id,
     userId: user.id,
-    role: user.role,
+    role,
     email: user.email,
   });
 
@@ -30,8 +34,9 @@ async function loginWithEmail({ email, password }) {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
+      role,
       isActive: user.isActive,
+      isBootstrapAccount: user.email?.toLowerCase() === env.superAdminEmail.toLowerCase(),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     },
