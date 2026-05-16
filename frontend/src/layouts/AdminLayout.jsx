@@ -62,18 +62,18 @@ const AdminLayout = () => {
           type="button"
           aria-label="إغلاق القائمة الجانبية"
           onClick={() => setIsSidebarOpen(false)}
-          className="xl:hidden fixed inset-0 top-[86px] bg-slate-900/30 z-30"
+          className="lg:hidden fixed inset-0 top-[86px] bg-slate-900/30 z-30"
         />
       )}
 
       <aside
-        className={`w-[86%] max-w-[320px] sm:max-w-[360px] bg-white border-l border-[#dbe7f3] shadow-sm fixed top-[86px] right-0 bottom-0 z-40 overflow-hidden flex flex-col transform transition-all duration-300 xl:translate-x-0 xl:max-w-none xl:h-[calc(100vh-86px)] ${
-          isDesktopSidebarCollapsed ? 'xl:w-24' : 'xl:w-72'
+        className={`w-[86%] max-w-[320px] sm:max-w-[360px] bg-white border-l border-[#dbe7f3] shadow-sm fixed top-[86px] right-0 bottom-0 lg:bottom-[56px] z-40 overflow-hidden flex flex-col transform transition-all duration-300 lg:translate-x-0 lg:max-w-none ${
+          isDesktopSidebarCollapsed ? 'lg:w-24' : 'lg:w-72'
         } ${
           isSidebarOpen ? 'translate-x-0' : 'translate-x-[110%]'
         }`}
       >
-        <div className="hidden xl:flex absolute top-3 left-3 z-10">
+        <div className="hidden lg:flex absolute top-3 left-3 z-10">
           <button
             type="button"
             className="relative inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[#dbe7f3] text-slate-600 hover:bg-[#f4f8fc]"
@@ -89,12 +89,12 @@ const AdminLayout = () => {
           <Link to="/admin/dashboard" className="flex items-center gap-3" onClick={() => setIsSidebarOpen(false)}>
             <div
               className={`w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-2xl bg-white border border-[#dbe7f3] shadow-sm items-center justify-center overflow-hidden p-1 ${
-                isDesktopSidebarCollapsed ? 'hidden xl:hidden' : 'flex'
+                isDesktopSidebarCollapsed ? 'hidden lg:hidden' : 'flex'
               }`}
             >
               <img src="/logo.png" alt="Clinic" className="w-full h-full object-contain" />
             </div>
-            <div className={`min-w-0 mt-2 ${isDesktopSidebarCollapsed ? 'xl:hidden' : ''}`}>
+            <div className={`min-w-0 mt-2 ${isDesktopSidebarCollapsed ? 'lg:hidden' : ''}`}>
               <h1 className="text-base sm:text-lg font-black text-blue-700 leading-tight">مركز التأهيل والتخاطب</h1>
               <p className="text-xs sm:text-sm text-slate-500 leading-5">نظام إدارة المرضى والجلسات والتقارير</p>
             </div>
@@ -102,7 +102,7 @@ const AdminLayout = () => {
         </div>
 
         <nav className="admin-sidebar-scroll flex-1 min-h-0 px-4 sm:px-5 lg:p-6 overflow-y-auto overscroll-contain">
-          <div className="flex lg:flex-col gap-2 overflow-x-auto pb-2 lg:pb-0">
+          <div className="flex flex-col gap-2 pb-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname.startsWith(item.path);
@@ -112,14 +112,14 @@ const AdminLayout = () => {
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsSidebarOpen(false)}
-                  className={`shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold transition-all ${
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold transition-all ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/10'
                       : 'bg-white text-slate-600 hover:bg-[#f4f8fc]'
-                  } ${isDesktopSidebarCollapsed ? 'xl:justify-center xl:px-2' : ''}`}
+                  } ${isDesktopSidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                 >
                   <Icon size={20} />
-                  <span className={`whitespace-nowrap ${isDesktopSidebarCollapsed ? 'xl:hidden' : ''}`}>{item.label}</span>
+                  <span className={`whitespace-nowrap ${isDesktopSidebarCollapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
                 </Link>
               );
             })}
@@ -130,10 +130,10 @@ const AdminLayout = () => {
           <Link
             to="/student/login"
             onClick={() => setIsSidebarOpen(false)}
-            className={`flex items-center gap-3 text-slate-600 hover:text-slate-900 font-bold px-4 py-3 rounded-2xl hover:bg-[#f4f8fc] transition-colors ${isDesktopSidebarCollapsed ? 'xl:justify-center xl:px-2' : ''}`}
+            className={`flex items-center gap-3 text-slate-600 hover:text-slate-900 font-bold px-4 py-3 rounded-2xl hover:bg-[#f4f8fc] transition-colors ${isDesktopSidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
           >
             <ArrowRight size={20} />
-            <span className={isDesktopSidebarCollapsed ? 'xl:hidden' : ''}>الانتقال لوضع الأسرة</span>
+            <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : ''}>الانتقال لوضع الأسرة</span>
           </Link>
 
           <button
@@ -141,35 +141,35 @@ const AdminLayout = () => {
               logoutAdmin();
               navigate('/admin/login');
             }}
-            className={`w-full flex items-center gap-3 text-red-600 font-bold px-4 py-3 rounded-2xl hover:bg-red-50 transition-colors ${isDesktopSidebarCollapsed ? 'xl:justify-center xl:px-2' : ''}`}
+            className={`w-full flex items-center gap-3 text-red-600 font-bold px-4 py-3 rounded-2xl hover:bg-red-50 transition-colors ${isDesktopSidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
           >
             <LogOut size={20} />
-            <span className={isDesktopSidebarCollapsed ? 'xl:hidden' : ''}>تسجيل الخروج</span>
+            <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : ''}>تسجيل الخروج</span>
           </button>
         </div>
       </aside>
 
       <main className="flex-1 p-4 pt-[106px] sm:p-6 sm:pt-[110px] lg:p-10 lg:pt-[108px] overflow-y-auto">
         <header className="fixed top-0 inset-x-0 z-50 border-b border-[#dbe7f3] bg-white/95 backdrop-blur-md shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
-          <div className="relative h-[86px] px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="h-[86px] px-4 md:px-6 py-3 flex items-center justify-between gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => setIsSidebarOpen((prev) => !prev)}
-              className="xl:hidden absolute right-4 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 bg-white border border-[#dbe7f3] text-slate-700 px-3 py-2 rounded-xl shadow-sm"
+              className="lg:hidden inline-flex items-center gap-2 bg-white border border-[#dbe7f3] text-slate-700 px-3 py-2 rounded-xl shadow-sm"
               aria-expanded={isSidebarOpen}
               aria-label={isSidebarOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
             >
               {isSidebarOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
 
-            <div className="mr-2 md:mr-0 flex items-center gap-2 rounded-xl border border-[#dbe7f3] bg-white px-4 py-2">
-              <span className="font-black text-slate-800">{currentTitle}</span>
+            <div className="min-w-0 max-w-[58%] sm:max-w-none flex items-center justify-center sm:justify-start gap-2 rounded-xl border border-[#dbe7f3] bg-white px-3 sm:px-4 py-2">
+              <span className="font-black text-slate-800 truncate">{currentTitle}</span>
             </div>
 
-            <div className="flex items-center gap-3 rounded-2xl border border-[#dbe7f3] bg-white px-4 py-2 shadow-sm">
+            <div className="flex items-center gap-2 sm:gap-3 rounded-2xl border border-[#dbe7f3] bg-white px-2.5 sm:px-4 py-2 shadow-sm">
               <div className="text-right">
                 <div className="text-xs text-slate-500 font-bold">المستخدم</div>
-                <div className="font-black text-slate-900 leading-tight">{adminSession?.name}</div>
+                <div className="font-black text-slate-900 leading-tight text-sm sm:text-base max-w-[120px] sm:max-w-none truncate">{adminSession?.name}</div>
               </div>
               <div className="w-11 h-11 rounded-xl overflow-hidden bg-blue-100 flex items-center justify-center">
                 <img src="/logo.png" alt="Clinic" className="w-9 h-9 object-contain" />
@@ -178,7 +178,7 @@ const AdminLayout = () => {
 
           </div>
         </header>
-        <div className="max-w-6xl mx-auto">
+        <div className="w-full">
           <Outlet />
         </div>
       </main>
@@ -187,6 +187,7 @@ const AdminLayout = () => {
 };
 
 export default AdminLayout;
+
 
 
 
