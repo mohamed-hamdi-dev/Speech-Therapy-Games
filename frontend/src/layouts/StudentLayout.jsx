@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -29,6 +29,8 @@ const StudentLayout = () => {
   const navigate = useNavigate();
   const { activeMode, currentStudent, logoutStudent } = useTherapyStore();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef(null);
 
   if (!currentStudent && location.pathname !== '/student/login') {
     return <Navigate to="/student/login" replace />;
@@ -54,6 +56,17 @@ const StudentLayout = () => {
     return match ? PAGE_TITLES[match] : 'بوابة المستفيد';
   }, [location.pathname]);
 
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
   if (isGameScreen) {
     return (
       <div dir="rtl" className="min-h-screen bg-[radial-gradient(circle_at_top,_#eaf7fb,_#f7fcfd_34%,_#ffffff_75%)] text-slate-800 font-arabic">
@@ -66,7 +79,7 @@ const StudentLayout = () => {
 
   return (
     <div dir="rtl" className="relative min-h-screen  bg-[radial-gradient(circle_at_top,_#eaf7fb,_#f7fcfd_34%,_#ffffff_75%)] text-slate-800 font-arabic">
-      <header className="fixed top-0 left-0 right-0 lg:right-[74px] z-40 border-b border-[#dbe7f3] bg-white/95 backdrop-blur-md shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+      <header className="fixed top-0 left-0 right-0 lg:right-[74px] z-40 border-b border-[#dbe7f3] bg-white/92 backdrop-blur-md shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
         <div className="w-full px-4 md:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
@@ -85,23 +98,36 @@ const StudentLayout = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50 transition-colors relative border border-slate-200 bg-white">
-              <Bell size={18} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
-            </button>
-            <div className="flex items-center gap-3 rounded-2xl border border-[#dbe7f3] bg-white px-4 py-2 shadow-sm">
-            <div className="text-right">
-              <div className="text-xs text-slate-500 font-bold">{activeMode === 'therapist' ? 'جلسة علاجية' : 'المستفيد'}</div>
-              <div className="font-black text-slate-900">{currentStudent?.name}</div>
-            </div>
-            <div className="w-11 h-11 rounded-xl overflow-hidden bg-blue-100 flex items-center justify-center">
-              {currentStudent?.avatarUrl ? (
-                <img src={currentStudent.avatarUrl} alt="صورة المستفيد" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-2xl">👦</span>
+            <div className="relative" ref={notificationsRef}>
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen((v) => !v)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50 transition-all duration-200 relative border border-slate-200 bg-white"
+              >
+                <Bell size={18} />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
+              </button>
+              {notificationsOpen && (
+                <div className="absolute top-12 left-0 w-72 rounded-2xl border border-[#dbe7f3] bg-white shadow-[0_18px_35px_rgba(15,23,42,0.14)] p-2 z-50">
+                  <div className="px-3 py-2 text-sm font-black text-slate-800 border-b border-slate-100">الإشعارات</div>
+                  <div className="px-3 py-2 text-sm text-slate-700">لا توجد إشعارات جديدة الآن.</div>
+                </div>
               )}
             </div>
-          </div>
+
+            <div className="flex items-center gap-3 rounded-2xl border border-[#dbe7f3] bg-white px-4 py-2 shadow-sm">
+              <div className="text-right">
+                <div className="text-xs text-slate-500 font-bold">{activeMode === 'therapist' ? 'جلسة علاجية' : 'المستفيد'}</div>
+                <div className="font-black text-slate-900">{currentStudent?.name}</div>
+              </div>
+              <div className="w-11 h-11 rounded-xl overflow-hidden bg-blue-100 flex items-center justify-center">
+                {currentStudent?.avatarUrl ? (
+                  <img src={currentStudent.avatarUrl} alt="صورة المستفيد" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl">👦</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -116,13 +142,13 @@ const StudentLayout = () => {
       )}
 
       <aside
-        className={`fixed right-0 top-[86px] z-30 border-l-2 border-b-2 border-[#c8dced] bg-white/95 backdrop-blur-md transition-all
-          lg:top-0 lg:bottom-4 lg:w-[74px] lg:rounded-bl-[2.5rem]
+        className={`fixed right-0 top-[86px] z-30 border-l border-b border-[#dbe7f3] bg-white/92 backdrop-blur-md transition-all
+          lg:top-0 lg:bottom-4 lg:w-[74px] lg:rounded-bl-2xl
           ${mobileNavOpen ? 'bottom-0 w-[78vw] max-w-[320px] opacity-100 translate-x-0' : 'bottom-0 w-[78vw] max-w-[320px] opacity-0 translate-x-full pointer-events-none'}
           lg:opacity-100 lg:translate-x-0 lg:pointer-events-auto`}
       >
-        <nav className="h-full flex flex-col p-2 pt-5 lg:pt-6 gap-1 overflow-visible">
-          <div className="hidden lg:flex items-center justify-center mb-2">
+        <nav className="h-full flex flex-col p-2 pt-5 lg:pt-6 gap-2 overflow-visible">
+          <div className="hidden lg:flex items-center justify-center mb-3">
             <div className="w-12 h-12 rounded-2xl border border-[#dbe7f3] bg-white/85 flex items-center justify-center shadow-sm">
               <img src="/logo.png" alt="logo" className="w-8 h-8 object-contain opacity-90" />
             </div>
@@ -136,12 +162,14 @@ const StudentLayout = () => {
                 to={item.to}
                 onClick={() => setMobileNavOpen(false)}
                 className={({ isActive }) =>
-                  `group relative flex items-center justify-start lg:justify-center gap-3 px-3 lg:px-2 py-3 rounded-xl font-bold transition-colors ${
-                    isActive ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'
+                  `group relative flex items-center justify-start lg:justify-center gap-3 px-3 lg:px-2 py-3 rounded-xl border transition-all duration-200 ${
+                    isActive
+                      ? 'bg-[#e9f4fb] text-[#138fbc] border-[#cfe5f3] shadow-sm'
+                      : 'text-slate-700 border-transparent hover:bg-slate-50 hover:border-[#e2edf6]'
                   }`
                 }
               >
-                <Icon size={18} />
+                <Icon size={19} />
                 <span className="text-sm font-bold lg:hidden">{item.label}</span>
                 <span className="pointer-events-none hidden lg:block absolute z-[120] right-full mr-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-[#138fbc] px-3 py-1.5 text-xs font-bold text-white opacity-0 translate-x-2 transition-all duration-200 shadow-lg shadow-cyan-900/25 group-hover:opacity-100 group-hover:translate-x-0">
                   {item.label}
@@ -156,9 +184,9 @@ const StudentLayout = () => {
               logoutStudent();
               navigate('/student/login');
             }}
-            className="group relative mt-2 flex items-center justify-start lg:justify-center gap-3 px-3 lg:px-2 py-3 rounded-xl border border-red-300/80 bg-red-50/40 font-bold text-red-600 hover:bg-red-50 transition-colors"
+            className="group relative mt-2 flex items-center justify-start lg:justify-center gap-3 px-3 lg:px-2 py-3 rounded-xl border border-red-300/80 bg-red-50/40 font-bold text-red-600 hover:bg-red-50 transition-all duration-200"
           >
-            <LogOut size={18} />
+            <LogOut size={19} />
             <span className="text-sm font-bold lg:hidden">خروج</span>
             <span className="pointer-events-none hidden lg:block absolute z-[120] right-full mr-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-[#138fbc] px-3 py-1.5 text-xs font-bold text-white opacity-0 translate-x-2 transition-all duration-200 shadow-lg shadow-cyan-900/25 group-hover:opacity-100 group-hover:translate-x-0">
               خروج
